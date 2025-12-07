@@ -1,4 +1,4 @@
-Homey app to receive realtime data from your SolarEdge, Growatt, Sungrow, Huawei, Kostal, Solax & Wattsonic solar installation using local Modbus TCP
+Homey app to receive realtime data from your Solis solar installation using local Modbus TCP
 
 ## Purpose
 
@@ -14,16 +14,7 @@ The iOS / android app from SolarEdge or Growatt are fine, so it is not the purpo
 
 Following devices are supported
 
-- Inverters with SetApp and with display
-- Modbus energy Meter
-- Storedge devices (DC connected battery storage)
-- Growatt - SPA, SPH or TL-X XXX Hybrid Inverter and others in the same range
-- Wattsonic gen3 inverter and their clones (sunways, solinteg, A-Tronix, St-ems)
-- Sungrow Hybrid and with battery
-- Huawei Hybrid and with battery, also double Huawei with s-dongle
-- Solax with battery
-- Kostal with battery
-- Sigenergy with battery
+- Solis with battery
 
 ## Inverters
 
@@ -34,30 +25,6 @@ General information can be found at:
 
 - https://www.SolarEdge.com/sites/default/files/sunspec-implementation-technical-note.pdf
 - https://www.photovoltaikforum.com/core/attachment/265072-pdfcoffee-com-growatt-inverter-modbus-rtu-protocolii-v120-english-pdf-free-pdf/
-
-## Solaredge Inverters with SetApp
-
-Enable wifi direct on the inverter. Connect to the inverter access point like you would for a normal wifi network. The wifi password is published at the right side of the inverter. Then open up a browser and go to http://172.16.0.1 . From this webpage you can enable modbus TCP without setApp or installer account.
-
-## Solaredge Inverters with display (without SetApp)
-
-Your CPU firmware has to be at least v 3.xxxx, if this is not the case, upgrade your firmware.
-https://www.SolarEdge.com/sites/default/files/upgrading_an_inverter_using_micro_sd_card.pdf
-Go to the menu by the following steps:
-
-- Long press the 'OK' button for a few seconds
-- Release the 'OK' button
-- The screen will ask a password, this is '12312312' (the 2nd button from the left is '1', the 3rd button is '2', etc...)
-- Go to Communication --> LAN Conf --> Modbus TCP (the default port is 502).
-- To modify the TCP port, select Modbus TCP --> TCP Port, set the port number and long-press Enter
-
-## Growatt inverters
-
-Please do the following on Growatt described in this doc https://www.dropbox.com/s/584915enkxc508u/Setup%20Growatt.pdf?dl=0
-
-## Wattsonic gen3 inverter
-
-following this blog Wattsonic Hybrid Inverter Gen3 Modbus RTU Protocol https://smarthome.exposed/wattsonic-hybrid-inverter-gen3-modbus-rtu-protocol/
 
 ## Support topic
 

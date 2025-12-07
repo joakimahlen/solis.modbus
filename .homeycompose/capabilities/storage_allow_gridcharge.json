@@ -1,0 +1,24 @@
+{
+  "type": "enum",
+  "title": {
+    "en": "Allow grid to charge battery"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "uiQuickAction": false,
+  "values": [
+    {
+      "id": "0",
+      "title": {
+        "en": "No"
+      }
+    },
+    {
+      "id": "1",
+      "title": {
+        "en": "Yes"
+      }
+    }
+  ]
+}

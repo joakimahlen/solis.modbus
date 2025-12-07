@@ -46,7 +46,7 @@
     {
       "type": "device",
       "name": "device",
-      "filter": "driver_id=invertorwithbatt"
+      "filter": "driver_id=soliswithbatt"
     }
   ]
 }

@@ -1,79 +1,31 @@
 {
-  "id": "solaredge.modbus",
-  "version": "3.0.223",
+  "id": "solis.modbus",
+  "version": "1.0.0",
   "compatibility": ">=5.0.0",
   "sdk": 3,
-  "brandColor": "#df001c",
+  "brandColor": "#f68f18",
   "platforms": [
     "local"
   ],
   "name": {
-    "en": "SolarEdge + Growatt TCP modbus"
+    "en": "Solis TCP modbus"
   },
   "description": {
-    "en": "Monitor various inverters over TCP modbus protocol",
-    "de": "Überwache verschieden Wechselrichter über das TCP-Modbus-Protokoll"
+    "en": "Monitor Solis inverters over TCP modbus protocol"
   },
   "category": [
     "energy"
   ],
   "tags": {
     "en": [
-      "solaredge",
-      "growatt",
+      "solis",
       "inverter",
       "solar",
-      "modbus",
-      "wattsonic",
-      "sunways",
-      "solinteg",
-      "A-Tronix",
-      "st-ems",
-      "sungrow",
-      "huawei",
-      "solax",
-      "kostal",
-      "sigenergy"
-    ],
-    "nl": [
-      "solaredge",
-      "growatt",
-      "omvormer",
-      "zonnepanelen",
-      "modbus",
-      "solar",
-      "modbus",
-      "wattsonic",
-      "sunways",
-      "solinteg",
-      "A-Tronix",
-      "st-ems",
-      "sungrow",
-      "huawei",
-      "solax",
-      "kostal",
-      "sigenergy"
-    ],
-    "de": [
-      "solaredge",
-      "growatt",
-      "wechselrichter",
-      "solar",
-      "modbus",
-      "wattsonic",
-      "sunways",
-      "solinteg",
-      "A-Tronix",
-      "st-ems",
-      "sungrow",
-      "huawei",
-      "solax",
-      "kostal",
-      "sigenergy"
+      "modbus"
     ]
   },
   "bugs": {
-    "url": "https://github.com/biemond/solaredge.modbus/issues"
+    "url": "https://github.com/joakimahlen/solis.modbus/issues"
   },
   "homeyCommunityTopicId": 45487,
   "permissions": [],
@@ -82,22 +34,14 @@
     "large": "/assets/images/large.jpg"
   },
   "author": {
-    "name": "Edwin Biemond",
-    "email": "biemond@gmail.com"
+    "name": "Joakim Ahlén",
+    "email": "joakim.ahlen@gmail.com"
   },
   "contributors": {
     "developers": [
       {
-        "name": "Pieter Verougstraete",
-        "email": "pieter.Verougstraete@gmail.com"
-      },
-      {
-        "name": "Richard Barkestam",
-        "email": "richard@barkestam.se"
-      },
-      {
-        "name": "Jelger Haanstra",
-        "email": "homey@solidewebservices.com"
+        "name": "Edwin Biemond",
+        "email": "biemond@gmail.com"
       }
     ]
   }

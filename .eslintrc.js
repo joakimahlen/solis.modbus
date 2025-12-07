@@ -21,13 +21,21 @@ module.exports = {
     },
   },
   rules: {
-    //eqeqeq: 'off', // Allow == without strict checking
+    'object-curly-newline': 'off',
+    'no-restricted-properties': 'off',
+    'import/prefer-default-export': 'off',
+    'node/no-missing-import': 'off',
+    'no-empty-pattern': 'off',
+    'no-console': 'off',
+    '@typescript-eslint/no-floating-promises': 'off',
+    indent: ['error', 2],
+    'max-len': ['error', { code: 300 }],
     'import/extensions': [
       'error',
       'ignorePackages',
       {
-        ts: 'never',
         js: 'never',
+        ts: 'never',
       },
     ],
   },

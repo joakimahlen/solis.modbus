@@ -9,39 +9,45 @@
   "uiQuickAction": false,
   "values": [
     {
-      "id": "0",
-      "title": {
-        "en": "Adaptive"
-      }
-    },
-    {
       "id": "1",
       "title": {
-        "en": "Fixed charge/discharge"
+        "en": "UPS"
       }
     },
     {
       "id": "2",
       "title": {
-        "en": "Maximum self consumption"
-      }
-    },
-    {
-      "id": "3",
-      "title": {
-        "en": "Time of use LG"
+        "en": "Self use"
       }
     },
     {
       "id": "4",
       "title": {
-        "en": "Fully fed to grid"
+        "en": "TOU Self use"
       }
     },
     {
-      "id": "5",
+      "id": "8",
       "title": {
-        "en": "Time of use LUNA2000"
+        "en": "Feed in priority"
+      }
+    },
+    {
+      "id": "16",
+      "title": {
+        "en": "TOU Feed in priority"
+      }
+    },
+    {
+      "id": "32",
+      "title": {
+        "en": "Backup"
+      }
+    },
+    {
+      "id": "64",
+      "title": {
+        "en": "Off-grid"
       }
     }
   ]

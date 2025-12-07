@@ -8,7 +8,7 @@
   },
   "tokens": [
     {
-      "name": "measure_temperature.invertor",
+      "name": "measure_temperature.inverter",
       "title": {
         "en": "Temperature",
         "nl": "Temperatuur",
@@ -23,7 +23,7 @@
     {
       "type": "device",
       "name": "device",
-      "filter": "driver_id=invertor|invertorwithbatt|sungrowhybirdwithbatt"
+      "filter": "driver_id=solis|soliswithbatt"
     }
   ]
 }

@@ -1,14 +1,11 @@
 {
   "highlight": true,
   "title": {
-    "en": "The solar power changed",
-    "nl": "Het solar vermogen is veranderd",
-    "de": "Solarleistung hat sich geändert",
-    "sv": "Soleffekten har ändrats"
+    "en": "The battery power changed"
   },
   "tokens": [
     {
-      "name": "measure_power",
+      "name": "measure_power.batt_power",
       "title": {
         "en": "Power",
         "nl": "Vermogen",
@@ -23,7 +20,7 @@
     {
       "type": "device",
       "name": "device",
-      "filter": "driver_id=solis|soliswithbatt"
+      "filter": "driver_id=soliswithbatt"
     }
   ]
 }

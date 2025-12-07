@@ -134,7 +134,7 @@
           "label": {
             "en": "17250W"
           }
-        },        
+        },
         {
           "id": "20000",
           "label": {
@@ -170,7 +170,7 @@
     {
       "type": "device",
       "name": "device",
-      "filter": "driver_id=invertorwithbatt"
+      "filter": "driver_id=soliswithbatt"
     }
   ]
 }

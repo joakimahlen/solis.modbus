@@ -6,7 +6,7 @@ const net = require('net');
 const socket = new net.Socket();
 
 const options = {
-  host: '192.168.42.79',
+  host: '192.168.1.43',
   port: 502,
   unitId: 1,
   timeout: 26,
@@ -22,13 +22,13 @@ socket.setKeepAlive(false);
 socket.connect(options);
 
 socket.on('connect', () => {
-  const delay = (function() {
+  const delay = (function () {
     let timer = 0;
-    return function(callback, ms) {
+    return function (callback, ms) {
       clearTimeout(timer);
       timer = setTimeout(callback, ms);
     };
-  }());
+  })();
 
   console.log('Connected ...');
 

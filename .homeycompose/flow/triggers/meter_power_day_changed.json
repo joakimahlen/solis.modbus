@@ -22,7 +22,7 @@
     {
       "type": "device",
       "name": "device",
-      "filter": "driver_id=invertor|invertorwithbatt|sungrowhybirdwithbatt|sungrow"
+      "filter": "driver_id=solis|soliswithbatt"
     }
   ]
 }
