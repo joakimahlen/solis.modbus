@@ -1,0 +1,25 @@
+{
+  "title": {
+    "en": "Storage Working Mode changed"
+  },
+  "titleFormatted": {
+    "en": "Storage Working Mode changed"
+  },
+  "tokens": [
+    {
+      "name": "storage_working_mode",
+      "type": "string",
+      "title": {
+        "en": "Storage Working Mode changed"
+      },
+      "example": "Fault"
+    }
+  ],
+  "args": [
+    {
+      "type": "device",
+      "name": "device",
+      "filter": "driver_id=solis|soliswithbatt"
+    }
+  ]
+}

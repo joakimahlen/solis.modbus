@@ -19,11 +19,11 @@ class MySolisDevice extends Solis {
     this.log(`device name id ${name}`);
     this.log(`device name ${this.getName()}`);
 
-    this.pollInvertor();
+    this.pollInverter();
 
     this.timer = this.homey.setInterval(() => {
       // poll device state from inverter
-      this.pollInvertor();
+      this.pollInverter();
     }, RETRY_INTERVAL);
   }
 
@@ -63,8 +63,8 @@ class MySolisDevice extends Solis {
     this.homey.clearInterval(this.timer);
   }
 
-  async pollInvertor() {
-    this.log('pollInvertor');
+  async pollInverter() {
+    this.log('pollInverter');
     this.log(this.getSetting('address'));
 
     const modbusOptions = {

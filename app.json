@@ -50,26 +50,17 @@
     "triggers": [
       {
         "title": {
-          "en": "Status Changed",
-          "nl": "Status gewijzigd",
-          "de": "Status hat sich geändert",
-          "sv": "Ändrad status"
+          "en": "Storage Control Mode changed"
         },
         "titleFormatted": {
-          "en": "Status changed",
-          "nl": "Status veranderd",
-          "de": "Status hat sich geändert",
-          "sv": "Statusen har ändrats"
+          "en": "Storage Control Mode changed"
         },
         "tokens": [
           {
-            "name": "status",
+            "name": "storage_control_mode",
             "type": "string",
             "title": {
-              "en": "Status",
-              "nl": "Status",
-              "de": "Status",
-              "sv": "Status"
+              "en": "Storage Control Mode changed"
             },
             "example": "Fault"
           }
@@ -81,7 +72,33 @@
             "filter": "driver_id=solis|soliswithbatt"
           }
         ],
-        "id": "changedStatus"
+        "id": "changedStorageControlMode"
+      },
+      {
+        "title": {
+          "en": "Storage Working Mode changed"
+        },
+        "titleFormatted": {
+          "en": "Storage Working Mode changed"
+        },
+        "tokens": [
+          {
+            "name": "storage_working_mode",
+            "type": "string",
+            "title": {
+              "en": "Storage Working Mode changed"
+            },
+            "example": "Fault"
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=solis|soliswithbatt"
+          }
+        ],
+        "id": "changedStorageWorkingMode"
       },
       {
         "title": {
@@ -310,109 +327,6 @@
           }
         ],
         "id": "acCharge"
-      },
-      {
-        "title": {
-          "en": "Inverter status !{{is|is not}}",
-          "de": "Status des Wechselrichters !{{ist|ist nicht}}",
-          "sv": "Växelriktarstatus !{{är|är inte}}"
-        },
-        "titleFormatted": {
-          "en": "Inverter status !{{is|is not}} [[argument_main]]",
-          "de": "Status des Wechselrichters !{{ist|ist nicht}} [[argument_main]]",
-          "sv": "Växelriktarstatus !{{är|är inte}} [[argument_main]]"
-        },
-        "hint": {
-          "en": "Inverter status",
-          "de": "Status des Wechselrichters",
-          "sv": "Växelriktarstatus"
-        },
-        "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=solis|soliswithbatt"
-          },
-          {
-            "name": "argument_main",
-            "type": "dropdown",
-            "values": [
-              {
-                "id": "0",
-                "label": {
-                  "en": "Undefined",
-                  "de": "Undefiniert",
-                  "sv": "Odefinierad"
-                }
-              },
-              {
-                "id": "1",
-                "label": {
-                  "en": "Off",
-                  "de": "Aus",
-                  "sv": "Av"
-                }
-              },
-              {
-                "id": "2",
-                "label": {
-                  "en": "Sleeping",
-                  "de": "Schlafend",
-                  "sv": "Viloläge"
-                }
-              },
-              {
-                "id": "3",
-                "label": {
-                  "en": "Grid Monitoring",
-                  "de": "Netzüberwachung",
-                  "sv": "Nätövervakning"
-                }
-              },
-              {
-                "id": "4",
-                "label": {
-                  "en": "Producing",
-                  "de": "Produzierend",
-                  "sv": "Producerar"
-                }
-              },
-              {
-                "id": "5",
-                "label": {
-                  "en": "Producing (Throttled)",
-                  "de": "Produzierend (gedrosselt)",
-                  "sv": "Producerar (Begränsad)"
-                }
-              },
-              {
-                "id": "6",
-                "label": {
-                  "en": "Shutting Down",
-                  "de": "Fährt herunter",
-                  "sv": "Stänger av"
-                }
-              },
-              {
-                "id": "7",
-                "label": {
-                  "en": "Fault",
-                  "de": "Störung",
-                  "sv": "Fel"
-                }
-              },
-              {
-                "id": "8",
-                "label": {
-                  "en": "Maintenance",
-                  "de": "Wartung",
-                  "sv": "Service"
-                }
-              }
-            ]
-          }
-        ],
-        "id": "changedStatus"
       },
       {
         "title": {
@@ -670,6 +584,200 @@
           }
         ],
         "id": "start_stop"
+      },
+      {
+        "id": "changedstorage_working_mode",
+        "title": {
+          "en": "Storage working mode is"
+        },
+        "titleFormatted": {
+          "en": "Storage working mode is [[argument_main]]"
+        },
+        "hint": {
+          "en": "The current Storage working mode"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=soliswithbatt"
+          },
+          {
+            "name": "argument_main",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "1",
+                "title": {
+                  "en": "Self use mode"
+                }
+              },
+              {
+                "id": "2",
+                "title": {
+                  "en": "Time of use mode"
+                }
+              },
+              {
+                "id": "4",
+                "title": {
+                  "en": "Off Grid Mode"
+                }
+              },
+              {
+                "id": "8",
+                "title": {
+                  "en": "Battery wakeup switch"
+                }
+              },
+              {
+                "id": "16",
+                "title": {
+                  "en": "Reserve battery mode"
+                }
+              },
+              {
+                "id": "32",
+                "title": {
+                  "en": "Allow grid to charge battery"
+                }
+              },
+              {
+                "id": "64",
+                "title": {
+                  "en": "Feed in priority"
+                }
+              },
+              {
+                "id": "128",
+                "title": {
+                  "en": "Batt OVC function"
+                }
+              },
+              {
+                "id": "256",
+                "title": {
+                  "en": "Battery force charge peak shaving"
+                }
+              },
+              {
+                "id": "512",
+                "title": {
+                  "en": "Battery correction enable"
+                }
+              },
+              {
+                "id": "1024",
+                "title": {
+                  "en": "Battery healing"
+                }
+              },
+              {
+                "id": "2048",
+                "title": {
+                  "en": "Peak Shaving"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "changedstorage_control_mode",
+        "title": {
+          "en": "Storage control mode is"
+        },
+        "titleFormatted": {
+          "en": "Storage control mode is [[argument_main]]"
+        },
+        "hint": {
+          "en": "The current Storage control mode"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=soliswithbatt"
+          },
+          {
+            "name": "argument_main",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "1",
+                "title": {
+                  "en": "Self use mode"
+                }
+              },
+              {
+                "id": "2",
+                "title": {
+                  "en": "Time of use mode"
+                }
+              },
+              {
+                "id": "4",
+                "title": {
+                  "en": "Off Grid Mode"
+                }
+              },
+              {
+                "id": "8",
+                "title": {
+                  "en": "Battery wakeup switch"
+                }
+              },
+              {
+                "id": "16",
+                "title": {
+                  "en": "Reserve battery mode"
+                }
+              },
+              {
+                "id": "32",
+                "title": {
+                  "en": "Allow grid to charge battery"
+                }
+              },
+              {
+                "id": "64",
+                "title": {
+                  "en": "Feed in priority"
+                }
+              },
+              {
+                "id": "128",
+                "title": {
+                  "en": "Batt OVC function"
+                }
+              },
+              {
+                "id": "256",
+                "title": {
+                  "en": "Battery force charge peak shaving"
+                }
+              },
+              {
+                "id": "512",
+                "title": {
+                  "en": "Battery correction enable"
+                }
+              },
+              {
+                "id": "1024",
+                "title": {
+                  "en": "Battery healing"
+                }
+              },
+              {
+                "id": "2048",
+                "title": {
+                  "en": "Peak Shaving"
+                }
+              }
+            ]
+          }
+        ]
       }
     ],
     "actions": [
@@ -987,9 +1095,12 @@
         "id": "prioritymode"
       },
       {
-        "id": "storage_working_mode_settings_main",
+        "id": "storage_working_mode_main",
         "title": {
-          "en": "Storage working mode setting"
+          "en": "Set storage working mode"
+        },
+        "titleFormatted": {
+          "en": "Set storage working mode to [[mode]]"
         },
         "args": [
           {
@@ -1309,7 +1420,7 @@
         "solis_model",
         "solis_status",
         "storage_control_mode",
-        "storage_working_mode_settings",
+        "storage_working_mode",
         "storage_allow_gridcharge"
       ],
       "capabilitiesOptions": {
@@ -1441,9 +1552,9 @@
             "en": "Storage control mode"
           }
         },
-        "storage_working_mode_settings": {
+        "storage_working_mode": {
           "title": {
-            "en": "Storage working mode setting"
+            "en": "Storage working mode"
           }
         },
         "storage_allow_gridcharge": {
@@ -3414,8 +3525,8 @@
         "en": "Storage control mode"
       },
       "getable": true,
-      "setable": false,
-      "uiComponent": "sensor",
+      "setable": true,
+      "uiComponent": "picker",
       "uiQuickAction": false,
       "values": [
         {
@@ -3492,14 +3603,14 @@
         }
       ]
     },
-    "storage_working_mode_settings": {
+    "storage_working_mode": {
       "type": "enum",
       "title": {
-        "en": "Storage working mode setting"
+        "en": "Storage working mode"
       },
       "getable": true,
-      "setable": false,
-      "uiComponent": "sensor",
+      "setable": true,
+      "uiComponent": "picker",
       "uiQuickAction": false,
       "values": [
         {

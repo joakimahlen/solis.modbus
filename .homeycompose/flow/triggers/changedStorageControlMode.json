@@ -1,0 +1,25 @@
+{
+  "title": {
+    "en": "Storage Control Mode changed"
+  },
+  "titleFormatted": {
+    "en": "Storage Control Mode changed"
+  },
+  "tokens": [
+    {
+      "name": "storage_control_mode",
+      "type": "string",
+      "title": {
+        "en": "Storage Control Mode changed"
+      },
+      "example": "Fault"
+    }
+  ],
+  "args": [
+    {
+      "type": "device",
+      "name": "device",
+      "filter": "driver_id=solis|soliswithbatt"
+    }
+  ]
+}

@@ -43,7 +43,7 @@
     "solis_model",
     "solis_status",
     "storage_control_mode",
-    "storage_working_mode_settings",
+    "storage_working_mode",
     "storage_allow_gridcharge"
   ],
   "capabilitiesOptions": {
@@ -175,9 +175,9 @@
         "en": "Storage control mode"
       }
     },
-    "storage_working_mode_settings": {
+    "storage_working_mode": {
       "title": {
-        "en": "Storage working mode setting"
+        "en": "Storage working mode"
       }
     },
     "storage_allow_gridcharge": {

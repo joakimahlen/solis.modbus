@@ -201,7 +201,7 @@ export class Solis extends Homey.Device {
         STORAGE_RATED_CAPACITY: { type: MRType.INPUT, addr: 43019, len: 1, dtype: 'UINT16', scale: 0, operation: Operation.DIRECT },
         STORAGE_CONTROL_MODE: { type: MRType.HOLDING, addr: 43110, len: 1, dtype: 'UINT16', scale: 0, capability: 'storage_control_mode', operation: Operation.STORAGE_CONTROL },
         ALLOW_GRIDCHARGE: { type: MRType.HOLDING, addr: 43110, len: 1, dtype: 'UINT16', scale: 0, capability: 'storage_allow_gridcharge', operation: Operation.ALLOW_GRIDCHARGE },
-        STORAGE_WORKING_MODE: { type: MRType.INPUT, addr: 33122, len: 1, dtype: 'UINT16', scale: 0, capability: 'storage_working_mode_settings', operation: Operation.TOSTRING },
+        STORAGE_WORKING_MODE: { type: MRType.INPUT, addr: 33122, len: 1, dtype: 'UINT16', scale: 0, capability: 'storage_working_mode', operation: Operation.TOSTRING },
     };
 
     static applyOperation(measurement: Measurement, operation: Operation): number | string {
@@ -218,8 +218,10 @@ export class Solis extends Homey.Device {
             case Operation.STORAGE_CONTROL:
                 return `${numValue & ~0x20}`;
 
-            case Operation.ALLOW_GRIDCHARGE:
-                return (numValue >> 5) & 1;
+            case Operation.ALLOW_GRIDCHARGE: {
+                const allowChargeNum = (numValue >> 5) & 1;
+                return allowChargeNum.toString();
+            }
 
             case Operation.DIRECT:
                 return scaledValue;

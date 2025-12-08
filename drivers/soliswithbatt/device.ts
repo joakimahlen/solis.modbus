@@ -20,11 +20,11 @@ class MySolisDeviceBattery extends Solis {
     this.log(`device name id ${name}`);
     this.log(`device name ${this.getName()}`);
 
-    this.pollInvertor();
+    this.pollInverter();
 
     this.timer = this.homey.setInterval(() => {
       // poll device state from inverter
-      this.pollInvertor();
+      this.pollInverter();
     }, RETRY_INTERVAL);
 
     // homey menu / device actions
@@ -33,14 +33,25 @@ class MySolisDeviceBattery extends Solis {
       return value;
     });
 
-    this.registerCapabilityListener('storage_working_mode_settings', async (value) => {
-      this.updateControl('storage_working_mode_settings', Number(value), this);
+    this.registerCapabilityListener('storage_working_mode', async (value) => {
+      this.updateControl('storage_working_mode', Number(value), this);
       return value;
     });
 
-    const controlActionStorageWorkingModeSettings = this.homey.flow.getActionCard('storage_working_mode_settings_main');
-    controlActionStorageWorkingModeSettings.registerRunListener(async (args, state) => {
-      await this.updateControl('storage_working_mode_settings', Number(args.mode), args.device);
+    const changedStorageWorkingmode = this.homey.flow.getConditionCard('changedstorage_working_mode');
+    changedStorageWorkingmode.registerRunListener(async (args, state) => {
+      this.log(`changedstorage_working_mode  storage_working_mode_main ${args.device.getCapabilityValue('storage_working_mode_main')}`);
+      this.log(`changedstorage_working_mode  argument_main ${args.argument_main}`);
+      const result = (await args.device.getCapabilityValue('storage_working_mode_main')) === args.argument_main;
+      return Promise.resolve(result);
+    });
+
+    const changedStorageControlmode = this.homey.flow.getConditionCard('changedstorage_control_mode');
+    changedStorageControlmode.registerRunListener(async (args, state) => {
+      this.log(`changedstorage_control_mode  storage_control_mode_main ${args.device.getCapabilityValue('storage_control_mode_main')}`);
+      this.log(`changedstorage_control_mode  argument_main ${args.argument_main}`);
+      const result = (await args.device.getCapabilityValue('storage_control_mode_main')) === args.argument_main;
+      return Promise.resolve(result);
     });
 
   }
@@ -107,13 +118,15 @@ class MySolisDeviceBattery extends Solis {
       console.log('Connected ...');
 
       if (type === 'storage_control_mode') {
-        const storageForceRes = await client.writeSingleRegister(47100, value);
+        //        const storageForceRes = await client.writeSingleRegister(47100, value);
+        const storageForceRes = 'FAKE';
         console.log('storage_control_mode', storageForceRes);
       }
 
-      if (type === 'storage_working_mode_settings') {
-        const storageworkingmodesettingsRes = await client.writeSingleRegister(47086, value);
-        console.log('storage_working_mode_settings', storageworkingmodesettingsRes);
+      if (type === 'storage_working_mode') {
+        //        const storageworkingmodesettingsRes = await client.writeSingleRegister(47086, value);
+        const storageworkingmodesettingsRes = 'FAKE';
+        console.log('storage_working_mode', storageworkingmodesettingsRes);
       }
 
       console.log('disconnect');
@@ -132,8 +145,8 @@ class MySolisDeviceBattery extends Solis {
     });
   }
 
-  async pollInvertor() {
-    this.log('pollInvertor');
+  async pollInverter() {
+    this.log('pollInverter');
     this.log(this.getSetting('address'));
 
     const modbusOptions = {

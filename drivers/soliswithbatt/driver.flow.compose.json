@@ -1,11 +1,199 @@
 {
   "triggers": [],
-  "conditions": [],
+  "conditions": [
+    {
+      "id": "changedstorage_working_mode",
+      "title": {
+        "en": "Storage working mode is"
+      },
+      "titleFormatted": {
+        "en": "Storage working mode is [[argument_main]]"
+      },
+      "hint": {
+        "en": "The current Storage working mode"
+      },
+      "args": [
+        {
+          "name": "argument_main",
+          "type": "dropdown",
+          "values": [
+            {
+              "id": "1",
+              "title": {
+                "en": "Self use mode"
+              }
+            },
+            {
+              "id": "2",
+              "title": {
+                "en": "Time of use mode"
+              }
+            },
+            {
+              "id": "4",
+              "title": {
+                "en": "Off Grid Mode"
+              }
+            },
+            {
+              "id": "8",
+              "title": {
+                "en": "Battery wakeup switch"
+              }
+            },
+            {
+              "id": "16",
+              "title": {
+                "en": "Reserve battery mode"
+              }
+            },
+            {
+              "id": "32",
+              "title": {
+                "en": "Allow grid to charge battery"
+              }
+            },
+            {
+              "id": "64",
+              "title": {
+                "en": "Feed in priority"
+              }
+            },
+            {
+              "id": "128",
+              "title": {
+                "en": "Batt OVC function"
+              }
+            },
+            {
+              "id": "256",
+              "title": {
+                "en": "Battery force charge peak shaving"
+              }
+            },
+            {
+              "id": "512",
+              "title": {
+                "en": "Battery correction enable"
+              }
+            },
+            {
+              "id": "1024",
+              "title": {
+                "en": "Battery healing"
+              }
+            },
+            {
+              "id": "2048",
+              "title": {
+                "en": "Peak Shaving"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "changedstorage_control_mode",
+      "title": {
+        "en": "Storage control mode is"
+      },
+      "titleFormatted": {
+        "en": "Storage control mode is [[argument_main]]"
+      },
+      "hint": {
+        "en": "The current Storage control mode"
+      },
+      "args": [
+        {
+          "name": "argument_main",
+          "type": "dropdown",
+          "values": [
+            {
+              "id": "1",
+              "title": {
+                "en": "Self use mode"
+              }
+            },
+            {
+              "id": "2",
+              "title": {
+                "en": "Time of use mode"
+              }
+            },
+            {
+              "id": "4",
+              "title": {
+                "en": "Off Grid Mode"
+              }
+            },
+            {
+              "id": "8",
+              "title": {
+                "en": "Battery wakeup switch"
+              }
+            },
+            {
+              "id": "16",
+              "title": {
+                "en": "Reserve battery mode"
+              }
+            },
+            {
+              "id": "32",
+              "title": {
+                "en": "Allow grid to charge battery"
+              }
+            },
+            {
+              "id": "64",
+              "title": {
+                "en": "Feed in priority"
+              }
+            },
+            {
+              "id": "128",
+              "title": {
+                "en": "Batt OVC function"
+              }
+            },
+            {
+              "id": "256",
+              "title": {
+                "en": "Battery force charge peak shaving"
+              }
+            },
+            {
+              "id": "512",
+              "title": {
+                "en": "Battery correction enable"
+              }
+            },
+            {
+              "id": "1024",
+              "title": {
+                "en": "Battery healing"
+              }
+            },
+            {
+              "id": "2048",
+              "title": {
+                "en": "Peak Shaving"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "actions": [
     {
-      "id": "storage_working_mode_settings_main",
+      "id": "storage_working_mode_main",
       "title": {
-        "en": "Storage working mode setting"
+        "en": "Set storage working mode"
+      },
+      "titleFormatted": {
+        "en": "Set storage working mode to [[mode]]"
       },
       "args": [
         {

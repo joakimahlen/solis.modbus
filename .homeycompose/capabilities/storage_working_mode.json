@@ -1,11 +1,11 @@
 {
   "type": "enum",
   "title": {
-    "en": "Storage working mode setting"
+    "en": "Storage working mode"
   },
   "getable": true,
-  "setable": false,
-  "uiComponent": "sensor",
+  "setable": true,
+  "uiComponent": "picker",
   "uiQuickAction": false,
   "values": [
     {
