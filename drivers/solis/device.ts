@@ -1,9 +1,9 @@
 import * as Modbus from 'jsmodbus';
 
-import net from 'net';
 import { HelperService } from '../../helper';
+import { Measurement } from '../measurement';
 import { Solis } from '../solis';
-import { checkSolisRegisters } from '../response';
+import net from 'net';
 
 const RETRY_INTERVAL = 32 * 1000;
 
@@ -73,7 +73,7 @@ class MySolisDevice extends Solis {
       unitId: this.getSetting('id'),
       timeout: 500,
       autoReconnect: false,
-      logLabel: 'solis Inverter',
+      logLabel: 'Solis Inverter',
       logLevel: 'debug',
       logEnabled: true,
     };
@@ -91,16 +91,28 @@ class MySolisDevice extends Solis {
       const startTime = new Date();
       await HelperService.delay(5000);
 
-      const capabilities = Object.values(this.inverterRegisters)
-        .filter((reg) => reg.capability !== undefined)
-        .map((reg) => reg.capability!);
+      const registers = {
+        ...this.inverterRegisters,
+      };
 
-      console.log('==== Adding capabilities...');
-      await this.addCapabilities(capabilities);
+      const results: Record<string, Measurement> = {};
 
-      const results = await checkSolisRegisters(this.inverterRegisters, client);
+      await Promise.all(
+        Object.keys(registers)
+          .map((key) => {
+            const reg = registers[key];
+            if (!reg.capability) {
+              return Promise.resolve();
+            }
 
-      await this.setCapabilityValues(results);
+            return this.updateSolisRegister(key, reg, client)
+              .then((result) => {
+                results[key] = result;
+              }).catch((error) => {
+                this.log(`error updating register ${reg.addr} - ${(error as Error).message}`);
+              });
+          }),
+      );
 
       this.log('disconnect');
       client.socket.end();

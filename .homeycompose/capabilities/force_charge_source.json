@@ -1,7 +1,7 @@
 {
   "type": "enum",
   "title": {
-    "en": "Charge/discharge command"
+    "en": "Force battery charge source is"
   },
   "getable": true,
   "setable": false,
@@ -9,21 +9,15 @@
   "uiQuickAction": false,
   "values": [
     {
-      "id": "170",
+      "id": "0",
       "title": {
-        "en": "Charge"
+        "en": "Charge only from grid"
       }
     },
     {
-      "id": "187",
+      "id": "1",
       "title": {
-        "en": "Discharge"
-      }
-    },
-    {
-      "id": "204",
-      "title": {
-        "en": "Stop"
+        "en": "Charge from PV and grid"
       }
     }
   ]

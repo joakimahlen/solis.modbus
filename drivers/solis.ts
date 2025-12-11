@@ -1,39 +1,87 @@
+import * as Modbus from 'jsmodbus';
+
+import { HelperService } from '../helper';
 import Homey from 'homey';
 /* eslint-disable indent */
 import { Measurement } from './measurement';
+import { read } from './response';
+
+export enum ForceBatteryChargeMode {
+    OFF = 0,
+    CHARGE = 1,
+    DISCHARGE = 2,
+    IDLE = 3,
+    PEAKSHAVING = 4
+}
+
+export enum PassiveMode {
+    OFF = 0,
+    ON = 0xaa55
+}
+
+export enum StorageControlMode {
+    SELF_USE_MODE = 1,
+    TOU_MODE = 2,
+    OFFGRID = 4,
+    BATTERY_WAKEUP = 8,
+    RESERVE_BATTERY = 16,
+    ALLOW_GRID_CHARGE = 32,
+    FEED_IN_PRIORITY = 64,
+    BATT_OVC_FUNCTION = 128,
+    BATTERY_FORCE_CHARGE_PEAK_SHAVING = 256,
+    BATTERY_CORRECTION_ENABLE = 512,
+    BATTERY_HEALING = 1024,
+    PEAK_SHAVING = 2048
+}
+
+export enum StorageWorkingMode {
+    UPS = 1,
+    SELF_USE = 2,
+    TOU_SELF_USE = 4,
+    FEED_IN_PRIORITY = 8,
+    TOU_FEED_IN_PRIORITY = 16,
+    BACKUP = 32,
+    OFF_GRID = 64,
+    FORCE_BATTERY_CHARGE = 128,
+    PASSIVE = 256
+}
+
+export enum ForceBatteryChargeDirection {
+    OFF = 0,
+    CHARGE = 1,
+    DISCHARGE = 2
+}
 
 export const DEVICE_STORAGE_WORKING_MODES: { [key: string]: string } = {
-    0x0001: 'UPS',
-    0x0002: 'Self use',
-    0x0004: 'TOU Self use',
-    0x0008: 'Feed in priority',
-    0x0010: 'TOU Feed in priority',
-    0x0020: 'Backup',
-    0x0040: 'Off-grid',
+    1: 'UPS',
+    2: 'Self use',
+    4: 'TOU Self use',
+    8: 'Feed in priority',
+    16: 'TOU Feed in priority',
+    32: 'Backup',
+    64: 'Off-grid',
+    128: 'Force battery charge',
+    256: 'Passive mode',
 };
 
 export const DEVICE_MODEL_DEFINITIONS: { [key: string]: string } = {
-    0x0000: 'No definition',
-    0x1010: '1 phase grid-tied inverter (Models 0.7-8K1P / 7-10K1P)',
-    0x1020: '3 phase grid-tied inverter (Models 3-20K 3P)',
-    0x1021: '3 phase grid-tied inverter (Models 25-50K/50-70K/80-110K/90-136K/125K/250K)',
-    0x1070: 'External EPM device',
-    0x2030: '1 phase LV Hybrid inverter',
-    0x2031: '1 phase LV AC Couple energy storage inverter',
-    0x2032: '5-15kWh all in one hybrid',
-    0x2040: '1 phase HV Hybrid inverter',
-    0x2050: '3 phases LV Hybrid inverter',
-    0x2060: '3 phases HV Hybrid inverter 5G',
-    0x2070: 'S6 3PH HV 5-10Kw Hybrid',
-    0x2071: 'S6 3PH HV 12-20kW Hybrid',
-    0x2072: 'S6 3PH LV 10-15kW Hybrid',
-    0x2073: 'S6 3PH HV 50kW Hybrid',
-    0x2171: 'S6 3PH HV 15kW Hybrid',
-    0x2080: '1 phase HV Hybrid inverter S6',
-    0x2090: '1 phase LV Hybrid inverter S6',
-    0x2091: 'S6 1PH LV AC Coupled Hybrid',
-    0x3010: 'OGI Off-grid inverter',
-    0x3020: 'S6 1PH LV Off Grid Hybrid',
+    0x2070: 'S6-EH3P-5-10K-H',
+    0x2071: 'S6-EH3P-12-20K-H',
+    0x2072: 'S6-EH3P-10-15K-LV',
+    0x2073: 'S6-EH3P-30-50K-H-Original',
+    0x2080: 'S6-EH1P-HV',
+    0x2081: 'S6-EH1P-HV-12-16K-US',
+    0x2090: 'S6-EH1P-LV',
+    0x2091: 'S6-EH1P-LV-AC-Coupled',
+    0x2171: 'S6-EH3P-12-20K-H-Adjusted',
+    0x2172: 'S6-EH3P-10-15K-LV-Adjusted',
+    0x2173: 'S6-EH3P-30-50K-H',
+    0x2174: 'S6-EH3P-10K-BatteryReady',
+    0x2181: 'S6-EH1P-LV-12-16K-US',
+    0x2182: 'S6-EH1P-BatteryReady-US',
+    0x2190: 'S6-EH1P-LV-Adjusted',
+    0x2193: 'S6-EH1P-BatteryReady',
+    0x2273: 'S6-EH3P-30-50K-H-V2',
 };
 
 export const DEVICE_STATUS_DEFINITIONS: { [key: string]: string } = {
@@ -153,9 +201,15 @@ export interface ModbusRegister {
     operation: Operation;
 }
 
+export interface MonitoredRegister {
+    reg: ModbusRegister;
+    pollRate: number;
+}
+
 export class Solis extends Homey.Device {
     inverterRegisters: Record<string, ModbusRegister> = {
         inputPower: { type: MRType.INPUT, addr: 33057, len: 2, dtype: 'UINT32', scale: 0, capability: 'measure_power', operation: Operation.DIRECT },
+        /*
         PHASE_A_VOLTAGE: { type: MRType.INPUT, addr: 33073, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.phase1', operation: Operation.DIRECT },
         PHASE_B_VOLTAGE: { type: MRType.INPUT, addr: 33074, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.phase2', operation: Operation.DIRECT },
         PHASE_C_VOLTAGE: { type: MRType.INPUT, addr: 33075, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.phase3', operation: Operation.DIRECT },
@@ -165,10 +219,12 @@ export class Solis extends Homey.Device {
         PHASE_A_POWER: { type: MRType.INPUT, addr: 33512, len: 1, dtype: 'INT16', scale: 1, capability: 'measure_power.grid_phase1', operation: Operation.DIRECT },
         PHASE_B_POWER: { type: MRType.INPUT, addr: 33515, len: 1, dtype: 'INT16', scale: 1, capability: 'measure_power.grid_phase2', operation: Operation.DIRECT },
         PHASE_C_POWER: { type: MRType.INPUT, addr: 33518, len: 1, dtype: 'INT16', scale: 1, capability: 'measure_power.grid_phase3', operation: Operation.DIRECT },
+        */
         ACTIVE_POWER: { type: MRType.INPUT, addr: 33079, len: 2, dtype: 'INT32', scale: 0, capability: 'measure_power.active_power', operation: Operation.DIRECT },
         INTERNAL_TEMPERATURE: { type: MRType.INPUT, addr: 33093, len: 1, dtype: 'INT16', scale: -1, capability: 'measure_temperature.inverter', operation: Operation.DIRECT },
         DEVICE_STATUS: { type: MRType.INPUT, addr: 33095, len: 1, dtype: 'UINT16', scale: 0, capability: 'solis_status', operation: Operation.STATUS },
         modelName: { type: MRType.INPUT, addr: 35000, len: 1, dtype: 'UINT16', scale: 0, capability: 'solis_model', operation: Operation.MODEL },
+        /*
         PV1voltage: { type: MRType.INPUT, addr: 33049, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.pv1', operation: Operation.DIRECT },
         PV1current: { type: MRType.INPUT, addr: 33050, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.pv1', operation: Operation.DIRECT },
         PV2voltage: { type: MRType.INPUT, addr: 33051, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.pv2', operation: Operation.DIRECT },
@@ -177,9 +233,13 @@ export class Solis extends Homey.Device {
         PV3current: { type: MRType.INPUT, addr: 33054, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.pv3', operation: Operation.DIRECT },
         PV4voltage: { type: MRType.INPUT, addr: 33055, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.pv4', operation: Operation.DIRECT },
         PV4current: { type: MRType.INPUT, addr: 33056, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.pv4', operation: Operation.DIRECT },
+        */
+        PASSIVE_MODE: { type: MRType.HOLDING, addr: 43311, len: 1, dtype: 'UINT16', scale: 0, capability: 'passive_mode', operation: Operation.TOSTRING },
+        PEAK_SHAVING_MAX_GRID_POWER: { type: MRType.HOLDING, addr: 43488, len: 1, dtype: 'UINT16', scale: 2, capability: 'measure_power.peak_shaving_max_grid_power', operation: Operation.DIRECT },
     };
 
     meterRegisters: Record<string, ModbusRegister> = {
+        METER_POWER: { type: MRType.INPUT, addr: 33263, len: 2, dtype: 'INT32', scale: 0, capability: 'measure_power.grid', operation: Operation.DIRECT },
         GRID_IMPORTED_ENERGY: { type: MRType.INPUT, addr: 33169, len: 2, dtype: 'UINT32', scale: 0, capability: 'meter_power.grid_import', operation: Operation.DIRECT },
         GRID_EXPORTED_ENERGY: { type: MRType.INPUT, addr: 33173, len: 2, dtype: 'UINT32', scale: 0, capability: 'meter_power.grid_export', operation: Operation.DIRECT },
         GRID_IMPORTED_ENERGY_DAILY: { type: MRType.INPUT, addr: 33171, len: 2, dtype: 'UINT16', scale: -1, capability: 'meter_power.grid_import_daily', operation: Operation.DIRECT },
@@ -202,6 +262,11 @@ export class Solis extends Homey.Device {
         STORAGE_CONTROL_MODE: { type: MRType.HOLDING, addr: 43110, len: 1, dtype: 'UINT16', scale: 0, capability: 'storage_control_mode', operation: Operation.STORAGE_CONTROL },
         ALLOW_GRIDCHARGE: { type: MRType.HOLDING, addr: 43110, len: 1, dtype: 'UINT16', scale: 0, capability: 'storage_allow_gridcharge', operation: Operation.ALLOW_GRIDCHARGE },
         STORAGE_WORKING_MODE: { type: MRType.INPUT, addr: 33122, len: 1, dtype: 'UINT16', scale: 0, capability: 'storage_working_mode', operation: Operation.TOSTRING },
+        FORCE_CHARGE_SOURCE: { type: MRType.HOLDING, addr: 43028, len: 1, dtype: 'UINT16', scale: 0, capability: 'force_charge_source', operation: Operation.TOSTRING },
+        FORCE_CHARGE_LIMIT: { type: MRType.HOLDING, addr: 43027, len: 1, dtype: 'UINT16', scale: 1, capability: 'measure_power.force_charge_limit', operation: Operation.DIRECT },
+        FORCE_CHARGE_POWER: { type: MRType.HOLDING, addr: 43136, len: 1, dtype: 'UINT16', scale: 1, capability: 'measure_power.force_charge_power', operation: Operation.DIRECT },
+        FORCE_DISCHARGE_POWER: { type: MRType.HOLDING, addr: 43129, len: 1, dtype: 'UINT16', scale: 1, capability: 'measure_power.force_discharge_power', operation: Operation.DIRECT },
+        FORCE_CHARGE_DIRECTION: { type: MRType.HOLDING, addr: 43135, len: 1, dtype: 'UINT16', scale: 0, capability: 'force_charge_direction', operation: Operation.TOSTRING },
     };
 
     static applyOperation(measurement: Measurement, operation: Operation): number | string {
@@ -241,33 +306,52 @@ export class Solis extends Homey.Device {
 
     }
 
-    async addCapabilities(capabilities: string[]): Promise<void[]> {
-        const promises = capabilities
-            .map((capability) => this.addCapability(capability));
+    async setForceChargeCapability(result: Record<string, Measurement>): Promise<void> {
+        const chargeSource = result.FORCE_CHARGE_SOURCE?.value;
+        const chargeLimit = result.FORCE_CHARGE_LIMIT?.value;
+        const chargePower = result.FORCE_CHARGE_POWER?.value;
+        const dischargePower = result.FORCE_DISCHARGE_POWER?.value;
+        const chargeDirection = result.FORCE_CHARGE_DIRECTION?.value;
+        const storageControlMode: StorageControlMode = Number.parseInt(result.STORAGE_CONTROL_MODE?.value, 10);
 
-        return Promise.all(promises);
+        const isPeakShaving = (storageControlMode & StorageControlMode.PEAK_SHAVING) === StorageControlMode.PEAK_SHAVING;
+        const hasChargeLimit = chargeLimit !== '0';
+        const isCharging = chargeSource === '1' && chargeDirection === '1' && chargePower !== '0' && dischargePower === '0' && hasChargeLimit;
+        const isDischarging = chargeSource === '1' && chargeDirection === '2' && dischargePower !== '0' && chargePower === '0' && hasChargeLimit;
+        const isIdle = chargeSource === '1' && chargeDirection === '2' && dischargePower === '0' && chargePower === '0' && hasChargeLimit;
+
+        let mode = ForceBatteryChargeMode.OFF;
+
+        if (isDischarging && isPeakShaving) {
+            mode = ForceBatteryChargeMode.PEAKSHAVING;
+        }
+
+        if (isCharging && !isPeakShaving) {
+            mode = ForceBatteryChargeMode.CHARGE;
+        }
+
+        if (isDischarging && !isPeakShaving) {
+            mode = ForceBatteryChargeMode.DISCHARGE;
+        }
+
+        if (isIdle && !isPeakShaving) {
+            mode = ForceBatteryChargeMode.IDLE;
+        }
+
+        console.log('=== Determined force charge mode:', mode);
+
+        await this.addCapability('force_battery_charge_mode');
+        await this.setCapabilityValue('force_battery_charge_mode', `${mode}`);
     }
 
-    async setCapabilityValues(result: Record<string, Measurement>): Promise<void[]> {
-        const promises = Object.keys(result).map(async (k) => {
-            const measurement = result[k];
-            console.log('solis: ', k, measurement.value, measurement.scale);
+    async updateSolisRegister(key: string, register: ModbusRegister, client: InstanceType<typeof Modbus.client.TCP>) {
+        const measurement = await read(register, client);
+        await this.addCapability(register.capability!);
+        const value = Solis.applyOperation(measurement, register.operation);
+        console.log(`= Read ${MRType[register.type]} #${register.addr} ${key} (${register.capability}) => ${measurement.value} => ${value}`);
+        await this.setCapabilityValue(register.capability!, value);
+        await HelperService.delay(10);
 
-            if (measurement.value !== '-1' && measurement.value !== 'xxx') {
-                const convertedValue = Solis.applyOperation(measurement, measurement.operation);
-
-                console.log(`Setting '${measurement.capability}' to`, convertedValue);
-                return this.setCapabilityValue(measurement.capability, convertedValue)
-                    .catch((e) => {
-                        console.error('Error setting capability value for', measurement.capability, (e as Error).message);
-                        return Promise.resolve();
-                    });
-            }
-            console.log('=== Skipping measurement', measurement);
-            return Promise.resolve();
-
-        });
-
-        return Promise.all(promises);
+        return measurement;
     }
 }

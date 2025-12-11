@@ -42,9 +42,18 @@
     "meter_power.grid_import_daily",
     "solis_model",
     "solis_status",
+    "force_battery_charge_mode",
     "storage_control_mode",
     "storage_working_mode",
-    "storage_allow_gridcharge"
+    "storage_allow_gridcharge",
+    "force_charge_source",
+    "measure_power.force_charge_limit",
+    "measure_power.force_charge_power",
+    "measure_power.force_discharge_power",
+    "force_charge_direction",
+    "measure_power.peak_shaving_max_grid_power",
+    "measure_power.grid",
+    "passive_mode"
   ],
   "capabilitiesOptions": {
     "measure_power": {
@@ -183,6 +192,51 @@
     "storage_allow_gridcharge": {
       "title": {
         "en": "Allow grid to charge battery"
+      }
+    },
+    "force_battery_charge_mode": {
+      "title": {
+        "en": "Force charge battery"
+      }
+    },
+    "measure_power.force_charge_limit": {
+      "title": {
+        "en": "Force charge limit"
+      }
+    },
+    "measure_power.force_charge_power": {
+      "title": {
+        "en": "Force charge power"
+      }
+    },
+    "measure_power.force_discharge_power": {
+      "title": {
+        "en": "Force discharge power"
+      }
+    },
+    "measure_power.peak_shaving_max_grid_power": {
+      "title": {
+        "en": "Peak shaving max grid power"
+      }
+    },
+    "measure_power.grid": {
+      "title": {
+        "en": "Grid power"
+      }
+    },
+    "force_charge_direction": {
+      "title": {
+        "en": "Force charge direction"
+      }
+    },
+    "force_charge_source": {
+      "title": {
+        "en": "Force charge source"
+      }
+    },
+    "passive_mode": {
+      "title": {
+        "en": "Passive mode"
       }
     },
     "measure_power.batt_power": {

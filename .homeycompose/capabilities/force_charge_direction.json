@@ -1,0 +1,30 @@
+{
+  "type": "enum",
+  "title": {
+    "en": "Force battery charge direction is"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "uiQuickAction": false,
+  "values": [
+    {
+      "id": "0",
+      "title": {
+        "en": "Off"
+      }
+    },
+    {
+      "id": "1",
+      "title": {
+        "en": "Charge"
+      }
+    },
+    {
+      "id": "2",
+      "title": {
+        "en": "Discharge"
+      }
+    }
+  ]
+}

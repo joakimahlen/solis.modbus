@@ -1,15 +1,19 @@
 import * as Modbus from 'jsmodbus';
 
-import Homey from 'homey';
-import net from 'net';
-import { HelperService } from '../../helper';
-import { Solis } from '../solis';
-import { checkSolisRegisters } from '../response';
+import { ForceBatteryChargeDirection, ForceBatteryChargeMode, PassiveMode, Solis, StorageControlMode } from '../solis';
 
-const RETRY_INTERVAL = 120 * 1000;
+import { HelperService } from '../../helper';
+import Homey from 'homey';
+import { Measurement } from '../measurement';
+import net from 'net';
+import { write } from '../response';
+
+const RETRY_INTERVAL = 30 * 1000;
 
 class MySolisDeviceBattery extends Solis {
   timer!: NodeJS.Timer;
+  //  timer2!: NodeJS.Timer;
+  client?: Modbus.ModbusTCPClient;
   /**
    * onInit is called when the device is initialized.
    */
@@ -27,6 +31,19 @@ class MySolisDeviceBattery extends Solis {
       this.pollInverter();
     }, RETRY_INTERVAL);
 
+    /*
+    this.timer2 = this.homey.setInterval(() => {
+      if (this.client) {
+        this.updateSolisRegister('BATTERY_POWER', this.batteryRegisters.BATTERY_POWER, this.client)
+          .then()
+          .catch((error) => console.error(`Error updating BATTERY_POWER register: ${error.message}`));
+        this.updateSolisRegister('METER_POWER', this.meterRegisters.METER_POWER, this.client)
+          .then()
+          .catch((error) => console.error(`Error updating METER_POWER register: ${error.message}`));
+      }
+    }, 5000);
+    */
+
     // homey menu / device actions
     this.registerCapabilityListener('storage_control_mode', async (value) => {
       this.updateControl('storage_control_mode', Number(value), this);
@@ -35,6 +52,11 @@ class MySolisDeviceBattery extends Solis {
 
     this.registerCapabilityListener('storage_working_mode', async (value) => {
       this.updateControl('storage_working_mode', Number(value), this);
+      return value;
+    });
+
+    this.registerCapabilityListener('force_battery_charge_mode', async (value) => {
+      this.updateControl('force_battery_charge_mode', Number(value), this);
       return value;
     });
 
@@ -54,6 +76,19 @@ class MySolisDeviceBattery extends Solis {
       return Promise.resolve(result);
     });
 
+    const changedForceBatteryCharge = this.homey.flow.getConditionCard('changedforce_battery_charge_mode');
+    changedForceBatteryCharge.registerRunListener(async (args, state) => {
+      this.log(`changedforce_battery_charge_mode  force_battery_charge_mode_main ${args.device.getCapabilityValue('force_battery_charge_mode_main')}`);
+      this.log(`changedforce_battery_charge_mode  argument_main ${args.argument_main}`);
+      const result = (await args.device.getCapabilityValue('force_battery_charge_mode_main')) === args.argument_main;
+      return Promise.resolve(result);
+    });
+
+  }
+
+  async onUninit(): Promise<void> {
+    this.log('MySolisDeviceBattery onUninit');
+    this.homey.clearInterval(this.timer);
   }
 
   /**
@@ -104,7 +139,7 @@ class MySolisDeviceBattery extends Solis {
       unitId: this.getSetting('id'),
       timeout: 500,
       autoReconnect: false,
-      logLabel: 'solis Inverter Battery',
+      logLabel: 'Solis Inverter Battery',
       logLevel: 'debug',
       logEnabled: true,
     };
@@ -118,15 +153,77 @@ class MySolisDeviceBattery extends Solis {
       console.log('Connected ...');
 
       if (type === 'storage_control_mode') {
-        //        const storageForceRes = await client.writeSingleRegister(47100, value);
-        const storageForceRes = 'FAKE';
-        console.log('storage_control_mode', storageForceRes);
+        const storageControlMode: StorageControlMode = value;
+        await write(this.batteryRegisters.STORAGE_CONTROL_MODE, client, storageControlMode);
+        console.log('storage_working_mode', storageControlMode);
       }
 
-      if (type === 'storage_working_mode') {
-        //        const storageworkingmodesettingsRes = await client.writeSingleRegister(47086, value);
-        const storageworkingmodesettingsRes = 'FAKE';
-        console.log('storage_working_mode', storageworkingmodesettingsRes);
+      if (type === 'force_battery_charge_mode') {
+        try {
+          await write(this.batteryRegisters.FORCE_CHARGE_LIMIT, client, 5000);
+          await write(this.batteryRegisters.FORCE_CHARGE_SOURCE, client, 1);
+
+          const chargeMode = value as ForceBatteryChargeMode;
+
+          if (chargeMode === ForceBatteryChargeMode.CHARGE) {
+            console.log('= Setting CHARGE mode');
+            await write(this.inverterRegisters.PASSIVE_MODE, client, PassiveMode.ON);
+            await write(this.batteryRegisters.STORAGE_CONTROL_MODE, client, StorageControlMode.PEAK_SHAVING);
+            await write(this.batteryRegisters.FORCE_CHARGE_POWER, client, 5000);
+            await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION, client, ForceBatteryChargeDirection.CHARGE);
+            await write(this.batteryRegisters.FORCE_DISCHARGE_POWER, client, 0);
+          } else if (chargeMode === ForceBatteryChargeMode.DISCHARGE) {
+            console.log('= Setting DISCHARGE mode');
+            await write(this.inverterRegisters.PASSIVE_MODE, client, PassiveMode.ON);
+            await write(this.batteryRegisters.STORAGE_CONTROL_MODE, client, StorageControlMode.PEAK_SHAVING);
+            await write(this.batteryRegisters.FORCE_CHARGE_POWER, client, 0);
+            await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION, client, ForceBatteryChargeDirection.DISCHARGE);
+            await write(this.batteryRegisters.FORCE_DISCHARGE_POWER, client, 5000);
+          } else if (chargeMode === ForceBatteryChargeMode.PEAKSHAVING) {
+            console.log('= Setting PEAKSHAVING mode');
+            await write(this.inverterRegisters.PASSIVE_MODE, client, PassiveMode.ON);
+            await write(this.batteryRegisters.STORAGE_CONTROL_MODE, client, StorageControlMode.PEAK_SHAVING);
+            await write(this.batteryRegisters.FORCE_CHARGE_POWER, client, 0);
+            await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION, client, ForceBatteryChargeDirection.DISCHARGE);
+            await write(this.batteryRegisters.FORCE_DISCHARGE_POWER, client, 5000);
+          } else if (chargeMode === ForceBatteryChargeMode.IDLE) {
+            console.log('= Setting IDLE mode');
+            await write(this.inverterRegisters.PASSIVE_MODE, client, PassiveMode.ON);
+            await write(this.batteryRegisters.FORCE_CHARGE_POWER, client, 0);
+            await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION, client, ForceBatteryChargeDirection.DISCHARGE);
+            await write(this.batteryRegisters.FORCE_DISCHARGE_POWER, client, 0);
+          } else {
+            await write(this.inverterRegisters.PASSIVE_MODE, client, PassiveMode.OFF);
+            await write(this.batteryRegisters.STORAGE_CONTROL_MODE, client, StorageControlMode.SELF_USE_MODE | StorageControlMode.ALLOW_GRID_CHARGE);
+          }
+
+          await HelperService.delay(2000);
+
+          const storageControlMode = await this.updateSolisRegister('STORAGE_CONTROL_MODE', this.batteryRegisters.STORAGE_CONTROL_MODE, client);
+          const storageWorkingMode = await this.updateSolisRegister('STORAGE_WORKING_MODE', this.batteryRegisters.STORAGE_WORKING_MODE, client);
+          const peakPower = await this.updateSolisRegister('PEAK_SHAVING_MAX_GRID_POWER', this.inverterRegisters.PEAK_SHAVING_MAX_GRID_POWER, client);
+          const forceChargePower = await this.updateSolisRegister('FORCE_CHARGE_POWER', this.batteryRegisters.FORCE_CHARGE_POWER, client);
+          const forceChargeDirection = await this.updateSolisRegister('FORCE_CHARGE_DIRECTION', this.batteryRegisters.FORCE_CHARGE_DIRECTION, client);
+          const forceDischargePower = await this.updateSolisRegister('FORCE_DISCHARGE_POWER', this.batteryRegisters.FORCE_DISCHARGE_POWER, client);
+          const forceChargeSource = await this.updateSolisRegister('FORCE_CHARGE_SOURCE', this.batteryRegisters.FORCE_CHARGE_SOURCE, client);
+          const forceChargeLimit = await this.updateSolisRegister('FORCE_CHARGE_LIMIT', this.batteryRegisters.FORCE_CHARGE_LIMIT, client);
+
+          const result = {
+            STORAGE_CONTROL_MODE: storageControlMode,
+            STORAGE_WORKING_MODE: storageWorkingMode,
+            PEAK_SHAVING_MAX_GRID_POWER: peakPower,
+            FORCE_CHARGE_POWER: forceChargePower,
+            FORCE_CHARGE_DIRECTION: forceChargeDirection,
+            FORCE_DISCHARGE_POWER: forceDischargePower,
+            FORCE_CHARGE_SOURCE: forceChargeSource,
+            FORCE_CHARGE_LIMIT: forceChargeLimit,
+          };
+
+          this.setForceChargeCapability(result);
+
+        } catch (error) {
+          console.error('Error writing force battery charge mode:', error);
+        }
       }
 
       console.log('disconnect');
@@ -155,7 +252,7 @@ class MySolisDeviceBattery extends Solis {
       unitId: this.getSetting('id'),
       timeout: 500,
       autoReconnect: false,
-      logLabel: 'solis Inverter Battery',
+      logLabel: 'Solis Inverter Battery',
       logLevel: 'debug',
       logEnabled: true,
     };
@@ -168,25 +265,42 @@ class MySolisDeviceBattery extends Solis {
 
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     socket.on('connect', async () => {
+      this.client = client;
       this.log('Connected ...');
       this.log(modbusOptions);
       const startTime = new Date();
       await HelperService.delay(5000);
 
-      const registers = { ...this.inverterRegisters, ...this.batteryRegisters, ...this.meterRegisters };
+      const registers = {
+        ...this.inverterRegisters,
+        ...this.batteryRegisters,
+        ...this.meterRegisters,
+      };
 
-      const capabilities = Object.values(registers)
-        .filter((reg) => reg.capability !== undefined)
-        .map((reg) => reg.capability!);
+      const results: Record<string, Measurement> = {};
 
-      console.log('==== Adding capabilities...');
-      await this.addCapabilities(capabilities);
+      for (const key of Object.keys(registers)) {
 
-      const results = await checkSolisRegisters(registers, client);
+        const reg = registers[key];
+        if (!reg.capability) {
+          continue;
+        }
 
-      console.log('==== Setting capability values...');
-      await this.setCapabilityValues(results);
-      console.log('==== Values set!');
+        try {
+          const result = await this.updateSolisRegister(key, reg, client);
+          results[key] = result;
+        } catch (error) {
+          this.log(`error updating register ${reg.addr} - ${(error as Error).message}`);
+        }
+      }
+
+      try {
+        console.log('==== Setting force charge capability values...');
+        await this.setForceChargeCapability(results);
+        console.log('==== Values set!');
+      } catch (error) {
+        this.log('error updating force charge capability!');
+      }
 
       this.log('disconnect');
       client.socket.end();

@@ -1,0 +1,25 @@
+{
+  "title": {
+    "en": "Force battery charge mode changed"
+  },
+  "titleFormatted": {
+    "en": "Force battery charge mode changed"
+  },
+  "tokens": [
+    {
+      "name": "force_battery_charge_mode",
+      "type": "string",
+      "title": {
+        "en": "Force battery charge mode changed"
+      },
+      "example": "Fault"
+    }
+  ],
+  "args": [
+    {
+      "type": "device",
+      "name": "device",
+      "filter": "driver_id=solis|soliswithbatt"
+    }
+  ]
+}

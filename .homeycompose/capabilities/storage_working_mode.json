@@ -4,8 +4,8 @@
     "en": "Storage working mode"
   },
   "getable": true,
-  "setable": true,
-  "uiComponent": "picker",
+  "setable": false,
+  "uiComponent": "sensor",
   "uiQuickAction": false,
   "values": [
     {
@@ -48,6 +48,18 @@
       "id": "64",
       "title": {
         "en": "Off-grid"
+      }
+    },
+    {
+      "id": "128",
+      "title": {
+        "en": "Force battery charge mode"
+      }
+    },
+    {
+      "id": "256",
+      "title": {
+        "en": "Passive"
       }
     }
   ]

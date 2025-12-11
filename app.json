@@ -50,6 +50,32 @@
     "triggers": [
       {
         "title": {
+          "en": "Force battery charge mode changed"
+        },
+        "titleFormatted": {
+          "en": "Force battery charge mode changed"
+        },
+        "tokens": [
+          {
+            "name": "force_battery_charge_mode",
+            "type": "string",
+            "title": {
+              "en": "Force battery charge mode changed"
+            },
+            "example": "Fault"
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=solis|soliswithbatt"
+          }
+        ],
+        "id": "changedForceChargeMode"
+      },
+      {
+        "title": {
           "en": "Storage Control Mode changed"
         },
         "titleFormatted": {
@@ -586,6 +612,61 @@
         "id": "start_stop"
       },
       {
+        "id": "changedforce_battery_charge_mode",
+        "title": {
+          "en": "Force battery charge mode is"
+        },
+        "titleFormatted": {
+          "en": "Force battery charge is [[argument_main]]"
+        },
+        "hint": {
+          "en": "The current Force battery charge mode"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=soliswithbatt"
+          },
+          {
+            "name": "argument_main",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "0",
+                "title": {
+                  "en": "Off"
+                }
+              },
+              {
+                "id": "1",
+                "title": {
+                  "en": "Charge"
+                }
+              },
+              {
+                "id": "2",
+                "title": {
+                  "en": "Discharge"
+                }
+              },
+              {
+                "id": "3",
+                "title": {
+                  "en": "Idle"
+                }
+              },
+              {
+                "id": "4",
+                "title": {
+                  "en": "Peak-shaving"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
         "id": "changedstorage_working_mode",
         "title": {
           "en": "Storage working mode is"
@@ -658,6 +739,12 @@
                 "id": "256",
                 "title": {
                   "en": "Battery force charge peak shaving"
+                }
+              },
+              {
+                "id": "257",
+                "title": {
+                  "en": "Custom peak shaving"
                 }
               },
               {
@@ -755,6 +842,12 @@
                 "id": "256",
                 "title": {
                   "en": "Battery force charge peak shaving"
+                }
+              },
+              {
+                "id": "257",
+                "title": {
+                  "en": "Custom peak shaving"
                 }
               },
               {
@@ -1153,6 +1246,70 @@
                 "title": {
                   "en": "Off-grid"
                 }
+              },
+              {
+                "id": "128",
+                "title": {
+                  "en": "Force battery charge mode"
+                }
+              },
+              {
+                "id": "256",
+                "title": {
+                  "en": "Passive"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "force_battery_charge_mode_main",
+        "title": {
+          "en": "Set force battery mode"
+        },
+        "titleFormatted": {
+          "en": "Set force battery mode to [[mode]]"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=soliswithbatt"
+          },
+          {
+            "name": "mode",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "0",
+                "title": {
+                  "en": "Off"
+                }
+              },
+              {
+                "id": "1",
+                "title": {
+                  "en": "Charge"
+                }
+              },
+              {
+                "id": "2",
+                "title": {
+                  "en": "Discharge"
+                }
+              },
+              {
+                "id": "3",
+                "title": {
+                  "en": "Idle"
+                }
+              },
+              {
+                "id": "4",
+                "title": {
+                  "en": "Peak-shaving"
+                }
               }
             ]
           }
@@ -1419,9 +1576,18 @@
         "meter_power.grid_import_daily",
         "solis_model",
         "solis_status",
+        "force_battery_charge_mode",
         "storage_control_mode",
         "storage_working_mode",
-        "storage_allow_gridcharge"
+        "storage_allow_gridcharge",
+        "force_charge_source",
+        "measure_power.force_charge_limit",
+        "measure_power.force_charge_power",
+        "measure_power.force_discharge_power",
+        "force_charge_direction",
+        "measure_power.peak_shaving_max_grid_power",
+        "measure_power.grid",
+        "passive_mode"
       ],
       "capabilitiesOptions": {
         "measure_power": {
@@ -1560,6 +1726,51 @@
         "storage_allow_gridcharge": {
           "title": {
             "en": "Allow grid to charge battery"
+          }
+        },
+        "force_battery_charge_mode": {
+          "title": {
+            "en": "Force charge battery"
+          }
+        },
+        "measure_power.force_charge_limit": {
+          "title": {
+            "en": "Force charge limit"
+          }
+        },
+        "measure_power.force_charge_power": {
+          "title": {
+            "en": "Force charge power"
+          }
+        },
+        "measure_power.force_discharge_power": {
+          "title": {
+            "en": "Force discharge power"
+          }
+        },
+        "measure_power.peak_shaving_max_grid_power": {
+          "title": {
+            "en": "Peak shaving max grid power"
+          }
+        },
+        "measure_power.grid": {
+          "title": {
+            "en": "Grid power"
+          }
+        },
+        "force_charge_direction": {
+          "title": {
+            "en": "Force charge direction"
+          }
+        },
+        "force_charge_source": {
+          "title": {
+            "en": "Force charge source"
+          }
+        },
+        "passive_mode": {
+          "title": {
+            "en": "Passive mode"
           }
         },
         "measure_power.batt_power": {
@@ -2042,194 +2253,6 @@
       "icon": "/assets/operational_status.svg",
       "decimals": 0
     },
-    "battfirst1": {
-      "type": "string",
-      "title": {
-        "en": "Battery 1st, Time slot 1",
-        "de": "Batterie zuerst, Zeitfenster 1:"
-      },
-      "getable": true,
-      "setable": false,
-      "uiComponent": "sensor",
-      "uiQuickAction": false,
-      "icon": "/assets/clock.svg"
-    },
-    "battfirst2": {
-      "type": "string",
-      "title": {
-        "en": "Battery 1st, Time slot 2",
-        "de": "Batterie zuerst, Zeitfenster 2:"
-      },
-      "getable": true,
-      "setable": false,
-      "uiComponent": "sensor",
-      "uiQuickAction": false,
-      "icon": "/assets/clock.svg"
-    },
-    "battfirst3": {
-      "type": "string",
-      "title": {
-        "en": "Battery 1st, Time slot 3",
-        "de": "Batterie zuerst, Zeitfenster 3:"
-      },
-      "getable": true,
-      "setable": false,
-      "uiComponent": "sensor",
-      "uiQuickAction": false,
-      "icon": "/assets/clock.svg"
-    },
-    "battstatus": {
-      "type": "enum",
-      "title": {
-        "en": "Battery status",
-        "de": "Batteriestatus"
-      },
-      "getable": true,
-      "setable": false,
-      "uiComponent": "sensor",
-      "uiQuickAction": false,
-      "icon": "/assets/operational_status.svg",
-      "values": [
-        {
-          "id": "0",
-          "title": {
-            "en": "Off",
-            "de": "Aus"
-          }
-        },
-        {
-          "id": "1",
-          "title": {
-            "en": "Standby",
-            "de": "Bereitschaft"
-          }
-        },
-        {
-          "id": "2",
-          "title": {
-            "en": "Init",
-            "de": "Initialisierung"
-          }
-        },
-        {
-          "id": "3",
-          "title": {
-            "en": "Charge",
-            "de": "Ladung"
-          }
-        },
-        {
-          "id": "4",
-          "title": {
-            "en": "Discharge",
-            "de": "Entladung"
-          }
-        },
-        {
-          "id": "5",
-          "title": {
-            "en": "Fault",
-            "de": "Störung"
-          }
-        },
-        {
-          "id": "6",
-          "title": {
-            "en": "Idle",
-            "de": "Leerlauf"
-          }
-        },
-        {
-          "id": "7",
-          "title": {
-            "en": "Idle",
-            "de": "Leerlauf"
-          }
-        },
-        {
-          "id": "10",
-          "title": {
-            "en": "Sleep"
-          }
-        }
-      ]
-    },
-    "battstatus2": {
-      "type": "enum",
-      "title": {
-        "en": "Battery 2 status",
-        "de": "Batteriestatus 2"
-      },
-      "getable": true,
-      "setable": false,
-      "uiComponent": "sensor",
-      "uiQuickAction": false,
-      "icon": "/assets/operational_status.svg",
-      "values": [
-        {
-          "id": "0",
-          "title": {
-            "en": "Off",
-            "de": "Aus"
-          }
-        },
-        {
-          "id": "1",
-          "title": {
-            "en": "Standby",
-            "de": "Bereitschaft"
-          }
-        },
-        {
-          "id": "2",
-          "title": {
-            "en": "Init",
-            "de": "Initialisierung"
-          }
-        },
-        {
-          "id": "3",
-          "title": {
-            "en": "Charge",
-            "de": "Ladung"
-          }
-        },
-        {
-          "id": "4",
-          "title": {
-            "en": "Discharge",
-            "de": "Entladung"
-          }
-        },
-        {
-          "id": "5",
-          "title": {
-            "en": "Fault",
-            "de": "Störung"
-          }
-        },
-        {
-          "id": "6",
-          "title": {
-            "en": "Idle",
-            "de": "Leerlauf"
-          }
-        },
-        {
-          "id": "7",
-          "title": {
-            "en": "Idle",
-            "de": "Leerlauf"
-          }
-        },
-        {
-          "id": "10",
-          "title": {
-            "en": "Sleep"
-          }
-        }
-      ]
-    },
     "bfchargerate": {
       "type": "number",
       "title": {
@@ -2264,36 +2287,6 @@
         "en": "W",
         "nl": "W"
       }
-    },
-    "chargedischargecommand": {
-      "type": "enum",
-      "title": {
-        "en": "Charge/discharge command"
-      },
-      "getable": true,
-      "setable": false,
-      "uiComponent": "sensor",
-      "uiQuickAction": false,
-      "values": [
-        {
-          "id": "170",
-          "title": {
-            "en": "Charge"
-          }
-        },
-        {
-          "id": "187",
-          "title": {
-            "en": "Discharge"
-          }
-        },
-        {
-          "id": "204",
-          "title": {
-            "en": "Stop"
-          }
-        }
-      ]
     },
     "emsmodeselection": {
       "type": "enum",
@@ -2445,6 +2438,102 @@
       "decimals": 1,
       "min": 0,
       "max": 100
+    },
+    "force_battery_charge_mode": {
+      "type": "enum",
+      "title": {
+        "en": "Force battery charge mode is"
+      },
+      "getable": true,
+      "setable": true,
+      "uiComponent": "picker",
+      "uiQuickAction": false,
+      "values": [
+        {
+          "id": "0",
+          "title": {
+            "en": "Off"
+          }
+        },
+        {
+          "id": "1",
+          "title": {
+            "en": "Charge"
+          }
+        },
+        {
+          "id": "2",
+          "title": {
+            "en": "Discharge"
+          }
+        },
+        {
+          "id": "3",
+          "title": {
+            "en": "Idle"
+          }
+        },
+        {
+          "id": "4",
+          "title": {
+            "en": "Peak-shaving"
+          }
+        }
+      ]
+    },
+    "force_charge_direction": {
+      "type": "enum",
+      "title": {
+        "en": "Force battery charge direction is"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "uiQuickAction": false,
+      "values": [
+        {
+          "id": "0",
+          "title": {
+            "en": "Off"
+          }
+        },
+        {
+          "id": "1",
+          "title": {
+            "en": "Charge"
+          }
+        },
+        {
+          "id": "2",
+          "title": {
+            "en": "Discharge"
+          }
+        }
+      ]
+    },
+    "force_charge_source": {
+      "type": "enum",
+      "title": {
+        "en": "Force battery charge source is"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "uiQuickAction": false,
+      "values": [
+        {
+          "id": "0",
+          "title": {
+            "en": "Charge only from grid"
+          }
+        },
+        {
+          "id": "1",
+          "title": {
+            "en": "Charge from PV and grid"
+          }
+        }
+      ]
     },
     "gfdischargerate": {
       "type": "number",
@@ -3000,6 +3089,30 @@
         "en": "W",
         "nl": "W"
       }
+    },
+    "passive_mode": {
+      "type": "enum",
+      "title": {
+        "en": "Passive mode is"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "uiQuickAction": false,
+      "values": [
+        {
+          "id": "0",
+          "title": {
+            "en": "Off"
+          }
+        },
+        {
+          "id": "43605",
+          "title": {
+            "en": "On"
+          }
+        }
+      ]
     },
     "period1": {
       "type": "string",
@@ -3584,6 +3697,12 @@
           }
         },
         {
+          "id": "257",
+          "title": {
+            "en": "Custom peak shaving"
+          }
+        },
+        {
           "id": "512",
           "title": {
             "en": "Battery correction enable"
@@ -3609,8 +3728,8 @@
         "en": "Storage working mode"
       },
       "getable": true,
-      "setable": true,
-      "uiComponent": "picker",
+      "setable": false,
+      "uiComponent": "sensor",
       "uiQuickAction": false,
       "values": [
         {
@@ -3653,6 +3772,18 @@
           "id": "64",
           "title": {
             "en": "Off-grid"
+          }
+        },
+        {
+          "id": "128",
+          "title": {
+            "en": "Force battery charge mode"
+          }
+        },
+        {
+          "id": "256",
+          "title": {
+            "en": "Passive"
           }
         }
       ]

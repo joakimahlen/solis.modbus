@@ -1,0 +1,24 @@
+{
+  "type": "enum",
+  "title": {
+    "en": "Passive mode is"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "uiQuickAction": false,
+  "values": [
+    {
+      "id": "0",
+      "title": {
+        "en": "Off"
+      }
+    },
+    {
+      "id": "43605",
+      "title": {
+        "en": "On"
+      }
+    }
+  ]
+}

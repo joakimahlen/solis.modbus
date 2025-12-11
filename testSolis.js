@@ -11,22 +11,19 @@ const options = {
   timeout: 26,
   autoReconnect: false,
   reconnectTimeout: 7,
-  logLabel: 'solis Inverter',
+  logLabel: 'Solis Inverter',
   logLevel: 'error',
   logEnabled: true,
 };
 
 const client = new modbus.client.TCP(socket, 1, 1000);
 
-const clients = [
-  client,
-];
+const clients = [client];
 
 socket.setKeepAlive(false);
 socket.connect(options);
 
 socket.on('connect', () => {
-
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
@@ -35,27 +32,23 @@ socket.on('connect', () => {
     console.log('Connected ...');
 
     registers = {
-
       solis_model: [3500, 1, 'UINT16', 'solis_model', 0],
-
     };
 
     holdingRegisters = {
-
       // "sigen_remote_ems_code": [40029, 1, 'UINT16', "Sigen Remote EMS code", 0],
-
     };
 
     for (const x in clients) {
       const wait = 100;
 
       await sleep(wait).then(async () => {
-
         console.log(`unitId: ${clients[x].unitId}`);
         const register = registers;
 
         for (const [key, value] of Object.entries(register)) {
-          clients[x].readInputRegisters(value[0], value[1])
+          clients[x]
+            .readInputRegisters(value[0], value[1])
             .then((resp) => {
               // console.log(resp.response._body);
               if (value[2] == 'UINT16') {
@@ -79,27 +72,23 @@ socket.on('connect', () => {
               console.log(err);
             });
           // });
-
         }
       });
-
     }
 
     delay(() => {
       socket.end();
     }, 6000);
-
   });
-
 });
 
-var delay = (function() {
+var delay = (function () {
   let timer = 0;
-  return function(callback, ms) {
+  return function (callback, ms) {
     clearTimeout(timer);
     timer = setTimeout(callback, ms);
   };
-}());
+})();
 
 // avoid all the crash reports
 socket.on('error', (err) => {

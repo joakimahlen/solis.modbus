@@ -2,6 +2,56 @@
   "triggers": [],
   "conditions": [
     {
+      "id": "changedforce_battery_charge_mode",
+      "title": {
+        "en": "Force battery charge mode is"
+      },
+      "titleFormatted": {
+        "en": "Force battery charge is [[argument_main]]"
+      },
+      "hint": {
+        "en": "The current Force battery charge mode"
+      },
+      "args": [
+        {
+          "name": "argument_main",
+          "type": "dropdown",
+          "values": [
+            {
+              "id": "0",
+              "title": {
+                "en": "Off"
+              }
+            },
+            {
+              "id": "1",
+              "title": {
+                "en": "Charge"
+              }
+            },
+            {
+              "id": "2",
+              "title": {
+                "en": "Discharge"
+              }
+            },
+            {
+              "id": "3",
+              "title": {
+                "en": "Idle"
+              }
+            },
+            {
+              "id": "4",
+              "title": {
+                "en": "Peak-shaving"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": "changedstorage_working_mode",
       "title": {
         "en": "Storage working mode is"
@@ -69,6 +119,12 @@
               "id": "256",
               "title": {
                 "en": "Battery force charge peak shaving"
+              }
+            },
+            {
+              "id": "257",
+              "title": {
+                "en": "Custom peak shaving"
               }
             },
             {
@@ -164,6 +220,12 @@
               }
             },
             {
+              "id": "257",
+              "title": {
+                "en": "Custom peak shaving"
+              }
+            },
+            {
               "id": "512",
               "title": {
                 "en": "Battery correction enable"
@@ -240,6 +302,65 @@
               "id": "64",
               "title": {
                 "en": "Off-grid"
+              }
+            },
+            {
+              "id": "128",
+              "title": {
+                "en": "Force battery charge mode"
+              }
+            },
+            {
+              "id": "256",
+              "title": {
+                "en": "Passive"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "force_battery_charge_mode_main",
+      "title": {
+        "en": "Set force battery mode"
+      },
+      "titleFormatted": {
+        "en": "Set force battery mode to [[mode]]"
+      },
+      "args": [
+        {
+          "name": "mode",
+          "type": "dropdown",
+          "values": [
+            {
+              "id": "0",
+              "title": {
+                "en": "Off"
+              }
+            },
+            {
+              "id": "1",
+              "title": {
+                "en": "Charge"
+              }
+            },
+            {
+              "id": "2",
+              "title": {
+                "en": "Discharge"
+              }
+            },
+            {
+              "id": "3",
+              "title": {
+                "en": "Idle"
+              }
+            },
+            {
+              "id": "4",
+              "title": {
+                "en": "Peak-shaving"
               }
             }
           ]

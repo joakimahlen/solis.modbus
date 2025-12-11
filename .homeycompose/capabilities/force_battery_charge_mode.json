@@ -1,0 +1,42 @@
+{
+  "type": "enum",
+  "title": {
+    "en": "Force battery charge mode is"
+  },
+  "getable": true,
+  "setable": true,
+  "uiComponent": "picker",
+  "uiQuickAction": false,
+  "values": [
+    {
+      "id": "0",
+      "title": {
+        "en": "Off"
+      }
+    },
+    {
+      "id": "1",
+      "title": {
+        "en": "Charge"
+      }
+    },
+    {
+      "id": "2",
+      "title": {
+        "en": "Discharge"
+      }
+    },
+    {
+      "id": "3",
+      "title": {
+        "en": "Idle"
+      }
+    },
+    {
+      "id": "4",
+      "title": {
+        "en": "Peak-shaving"
+      }
+    }
+  ]
+}

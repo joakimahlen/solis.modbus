@@ -63,6 +63,12 @@
       }
     },
     {
+      "id": "257",
+      "title": {
+        "en": "Custom peak shaving"
+      }
+    },
+    {
       "id": "512",
       "title": {
         "en": "Battery correction enable"
