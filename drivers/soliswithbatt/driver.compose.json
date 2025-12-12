@@ -51,9 +51,9 @@
     "measure_power.force_charge_power",
     "measure_power.force_discharge_power",
     "force_charge_direction",
-    "measure_power.peak_shaving_max_grid_power",
     "measure_power.grid",
-    "passive_mode"
+    "passive_mode",
+    "peak_shaving_max_grid_power"
   ],
   "capabilitiesOptions": {
     "measure_power": {
@@ -214,7 +214,7 @@
         "en": "Force discharge power"
       }
     },
-    "measure_power.peak_shaving_max_grid_power": {
+    "peak_shaving_max_grid_power": {
       "title": {
         "en": "Peak shaving max grid power"
       }

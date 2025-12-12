@@ -26,7 +26,9 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
+    "@types/lodash": "^4.17.21",
     "jsmodbus": "^4.0.10",
+    "lodash": "^4.17.21",
     "moment-timezone": "^0.5.47"
   }
 }

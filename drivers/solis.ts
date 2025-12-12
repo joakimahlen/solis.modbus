@@ -1,10 +1,13 @@
+/* eslint-disable indent */
 import * as Modbus from 'jsmodbus';
+
+import { filter, isNumber, min, values } from 'lodash';
+import { read, write } from './response';
 
 import { HelperService } from '../helper';
 import Homey from 'homey';
-/* eslint-disable indent */
 import { Measurement } from './measurement';
-import { read } from './response';
+import net from 'net';
 
 export enum ForceBatteryChargeMode {
     OFF = 0,
@@ -191,6 +194,13 @@ export enum Operation {
     ALLOW_GRIDCHARGE,
 }
 
+export enum PollRate {
+    PRIO1 = 10,
+    PRIO2 = 60,
+    PRIO3 = 120,
+    PRIO4 = 86400
+}
+
 export interface ModbusRegister {
     type: MRType;
     addr: number;
@@ -203,70 +213,68 @@ export interface ModbusRegister {
 
 export interface MonitoredRegister {
     reg: ModbusRegister;
-    pollRate: number;
+    pollRate: PollRate;
 }
 
 export class Solis extends Homey.Device {
-    inverterRegisters: Record<string, ModbusRegister> = {
-        inputPower: { type: MRType.INPUT, addr: 33057, len: 2, dtype: 'UINT32', scale: 0, capability: 'measure_power', operation: Operation.DIRECT },
-        /*
-        PHASE_A_VOLTAGE: { type: MRType.INPUT, addr: 33073, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.phase1', operation: Operation.DIRECT },
-        PHASE_B_VOLTAGE: { type: MRType.INPUT, addr: 33074, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.phase2', operation: Operation.DIRECT },
-        PHASE_C_VOLTAGE: { type: MRType.INPUT, addr: 33075, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.phase3', operation: Operation.DIRECT },
-        PHASE_A_CURRENT: { type: MRType.INPUT, addr: 33076, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.phase1', operation: Operation.DIRECT },
-        PHASE_B_CURRENT: { type: MRType.INPUT, addr: 33077, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.phase2', operation: Operation.DIRECT },
-        PHASE_C_CURRENT: { type: MRType.INPUT, addr: 33078, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.phase3', operation: Operation.DIRECT },
-        PHASE_A_POWER: { type: MRType.INPUT, addr: 33512, len: 1, dtype: 'INT16', scale: 1, capability: 'measure_power.grid_phase1', operation: Operation.DIRECT },
-        PHASE_B_POWER: { type: MRType.INPUT, addr: 33515, len: 1, dtype: 'INT16', scale: 1, capability: 'measure_power.grid_phase2', operation: Operation.DIRECT },
-        PHASE_C_POWER: { type: MRType.INPUT, addr: 33518, len: 1, dtype: 'INT16', scale: 1, capability: 'measure_power.grid_phase3', operation: Operation.DIRECT },
-        */
-        ACTIVE_POWER: { type: MRType.INPUT, addr: 33079, len: 2, dtype: 'INT32', scale: 0, capability: 'measure_power.active_power', operation: Operation.DIRECT },
-        INTERNAL_TEMPERATURE: { type: MRType.INPUT, addr: 33093, len: 1, dtype: 'INT16', scale: -1, capability: 'measure_temperature.inverter', operation: Operation.DIRECT },
-        DEVICE_STATUS: { type: MRType.INPUT, addr: 33095, len: 1, dtype: 'UINT16', scale: 0, capability: 'solis_status', operation: Operation.STATUS },
-        modelName: { type: MRType.INPUT, addr: 35000, len: 1, dtype: 'UINT16', scale: 0, capability: 'solis_model', operation: Operation.MODEL },
-        /*
-        PV1voltage: { type: MRType.INPUT, addr: 33049, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.pv1', operation: Operation.DIRECT },
-        PV1current: { type: MRType.INPUT, addr: 33050, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.pv1', operation: Operation.DIRECT },
-        PV2voltage: { type: MRType.INPUT, addr: 33051, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.pv2', operation: Operation.DIRECT },
-        PV2current: { type: MRType.INPUT, addr: 33052, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.pv2', operation: Operation.DIRECT },
-        PV3voltage: { type: MRType.INPUT, addr: 33053, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.pv3', operation: Operation.DIRECT },
-        PV3current: { type: MRType.INPUT, addr: 33054, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.pv3', operation: Operation.DIRECT },
-        PV4voltage: { type: MRType.INPUT, addr: 33055, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.pv4', operation: Operation.DIRECT },
-        PV4current: { type: MRType.INPUT, addr: 33056, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.pv4', operation: Operation.DIRECT },
-        */
-        PASSIVE_MODE: { type: MRType.HOLDING, addr: 43311, len: 1, dtype: 'UINT16', scale: 0, capability: 'passive_mode', operation: Operation.TOSTRING },
-        PEAK_SHAVING_MAX_GRID_POWER: { type: MRType.HOLDING, addr: 43488, len: 1, dtype: 'UINT16', scale: 2, capability: 'measure_power.peak_shaving_max_grid_power', operation: Operation.DIRECT },
+    chargeMode: ForceBatteryChargeMode = ForceBatteryChargeMode.OFF;
+
+    inverterRegisters: Record<string, MonitoredRegister> = {
+        inputPower: { reg: { type: MRType.INPUT, addr: 33057, len: 2, dtype: 'UINT32', scale: 0, capability: 'measure_power', operation: Operation.DIRECT }, pollRate: PollRate.PRIO1 },
+        PHASE_A_VOLTAGE: { reg: { type: MRType.INPUT, addr: 33073, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.phase1', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        PHASE_B_VOLTAGE: { reg: { type: MRType.INPUT, addr: 33074, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.phase2', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        PHASE_C_VOLTAGE: { reg: { type: MRType.INPUT, addr: 33075, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.phase3', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        PHASE_A_CURRENT: { reg: { type: MRType.INPUT, addr: 33076, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.phase1', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        PHASE_B_CURRENT: { reg: { type: MRType.INPUT, addr: 33077, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.phase2', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        PHASE_C_CURRENT: { reg: { type: MRType.INPUT, addr: 33078, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.phase3', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        PHASE_A_POWER: { reg: { type: MRType.INPUT, addr: 33512, len: 1, dtype: 'INT16', scale: 1, capability: 'measure_power.grid_phase1', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        PHASE_B_POWER: { reg: { type: MRType.INPUT, addr: 33515, len: 1, dtype: 'INT16', scale: 1, capability: 'measure_power.grid_phase2', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        PHASE_C_POWER: { reg: { type: MRType.INPUT, addr: 33518, len: 1, dtype: 'INT16', scale: 1, capability: 'measure_power.grid_phase3', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        ACTIVE_POWER: { reg: { type: MRType.INPUT, addr: 33079, len: 2, dtype: 'INT32', scale: 0, capability: 'measure_power.active_power', operation: Operation.DIRECT }, pollRate: PollRate.PRIO1 },
+        INTERNAL_TEMPERATURE: { reg: { type: MRType.INPUT, addr: 33093, len: 1, dtype: 'INT16', scale: -1, capability: 'measure_temperature.inverter', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        DEVICE_STATUS: { reg: { type: MRType.INPUT, addr: 33095, len: 1, dtype: 'UINT16', scale: 0, capability: 'solis_status', operation: Operation.STATUS }, pollRate: PollRate.PRIO2 },
+        modelName: { reg: { type: MRType.INPUT, addr: 35000, len: 1, dtype: 'UINT16', scale: 0, capability: 'solis_model', operation: Operation.MODEL }, pollRate: PollRate.PRIO4 },
+        PV1voltage: { reg: { type: MRType.INPUT, addr: 33049, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.pv1', operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
+        PV1current: { reg: { type: MRType.INPUT, addr: 33050, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.pv1', operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
+        PV2voltage: { reg: { type: MRType.INPUT, addr: 33051, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.pv2', operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
+        PV2current: { reg: { type: MRType.INPUT, addr: 33052, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.pv2', operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
+        PV3voltage: { reg: { type: MRType.INPUT, addr: 33053, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.pv3', operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
+        PV3current: { reg: { type: MRType.INPUT, addr: 33054, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.pv3', operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
+        PV4voltage: { reg: { type: MRType.INPUT, addr: 33055, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_voltage.pv4', operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
+        PV4current: { reg: { type: MRType.INPUT, addr: 33056, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.pv4', operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
+        PASSIVE_MODE: { reg: { type: MRType.HOLDING, addr: 43311, len: 1, dtype: 'UINT16', scale: 0, capability: 'passive_mode', operation: Operation.TOSTRING }, pollRate: PollRate.PRIO4 },
+        PEAK_SHAVING_MAX_GRID_POWER: { reg: { type: MRType.HOLDING, addr: 43488, len: 1, dtype: 'UINT16', scale: 2, capability: 'peak_shaving_max_grid_power', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
     };
 
-    meterRegisters: Record<string, ModbusRegister> = {
-        METER_POWER: { type: MRType.INPUT, addr: 33263, len: 2, dtype: 'INT32', scale: 0, capability: 'measure_power.grid', operation: Operation.DIRECT },
-        GRID_IMPORTED_ENERGY: { type: MRType.INPUT, addr: 33169, len: 2, dtype: 'UINT32', scale: 0, capability: 'meter_power.grid_import', operation: Operation.DIRECT },
-        GRID_EXPORTED_ENERGY: { type: MRType.INPUT, addr: 33173, len: 2, dtype: 'UINT32', scale: 0, capability: 'meter_power.grid_export', operation: Operation.DIRECT },
-        GRID_IMPORTED_ENERGY_DAILY: { type: MRType.INPUT, addr: 33171, len: 2, dtype: 'UINT16', scale: -1, capability: 'meter_power.grid_import_daily', operation: Operation.DIRECT },
-        GRID_EXPORTED_ENERGY_DAILY: { type: MRType.INPUT, addr: 33175, len: 2, dtype: 'UINT16', scale: -1, capability: 'meter_power.grid_export_daily', operation: Operation.DIRECT },
-        ACCUMULATED_YIELD_ENERGY: { type: MRType.INPUT, addr: 33029, len: 2, dtype: 'UINT32', scale: 0, capability: 'meter_power', operation: Operation.DIRECT },
-        DAILY_YIELD_ENERGY: { type: MRType.INPUT, addr: 33035, len: 1, dtype: 'UINT16', scale: -1, capability: 'meter_power.daily', operation: Operation.DIRECT },
+    meterRegisters: Record<string, MonitoredRegister> = {
+        METER_POWER: { reg: { type: MRType.INPUT, addr: 33263, len: 2, dtype: 'INT32', scale: 0, capability: 'measure_power.grid', operation: Operation.DIRECT }, pollRate: PollRate.PRIO1 },
+        GRID_IMPORTED_ENERGY: { reg: { type: MRType.INPUT, addr: 33169, len: 2, dtype: 'UINT32', scale: 0, capability: 'meter_power.grid_import', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        GRID_EXPORTED_ENERGY: { reg: { type: MRType.INPUT, addr: 33173, len: 2, dtype: 'UINT32', scale: 0, capability: 'meter_power.grid_export', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        GRID_IMPORTED_ENERGY_DAILY: { reg: { type: MRType.INPUT, addr: 33171, len: 2, dtype: 'UINT16', scale: -1, capability: 'meter_power.grid_import_daily', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        GRID_EXPORTED_ENERGY_DAILY: { reg: { type: MRType.INPUT, addr: 33175, len: 2, dtype: 'UINT16', scale: -1, capability: 'meter_power.grid_export_daily', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        ACCUMULATED_YIELD_ENERGY: { reg: { type: MRType.INPUT, addr: 33029, len: 2, dtype: 'UINT32', scale: 0, capability: 'meter_power', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        DAILY_YIELD_ENERGY: { reg: { type: MRType.INPUT, addr: 33035, len: 1, dtype: 'UINT16', scale: -1, capability: 'meter_power.daily', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
     };
 
-    batteryRegisters: Record<string, ModbusRegister> = {
-        BATTERY_POWER: { type: MRType.INPUT, addr: 33149, len: 2, dtype: 'INT32', scale: 0, capability: 'measure_power.batt_power', operation: Operation.DIRECT },
-        BATTERY: { type: MRType.INPUT, addr: 33139, len: 1, dtype: 'UINT16', scale: 0, capability: 'battery', operation: Operation.DIRECT },
-        MEASURE_BATTERY: { type: MRType.INPUT, addr: 33139, len: 1, dtype: 'UINT16', scale: 0, capability: 'measure_battery', operation: Operation.DIRECT },
-        STORAGE_CURRENT_DAY_CHARGE_CAPACITY: { type: MRType.INPUT, addr: 33163, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT },
-        STORAGE_CURRENT_DAY_DISCHARGE_CAPACITY: { type: MRType.INPUT, addr: 33167, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT },
-        STORAGE_TOTAL_CHARGE: { type: MRType.INPUT, addr: 33161, len: 2, dtype: 'UINT32', scale: 0, operation: Operation.DIRECT },
-        STORAGE_TOTAL_DISCHARGE: { type: MRType.INPUT, addr: 33165, len: 2, dtype: 'UINT32', scale: 0, operation: Operation.DIRECT },
-        STORAGE_MAXIMUM_CHARGE_POWER: { type: MRType.HOLDING, addr: 43012, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.chargesetting', operation: Operation.DIRECT },
-        STORAGE_MAXIMUM_DISCHARGE_POWER: { type: MRType.HOLDING, addr: 43013, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.dischargesetting', operation: Operation.DIRECT },
-        STORAGE_RATED_CAPACITY: { type: MRType.INPUT, addr: 43019, len: 1, dtype: 'UINT16', scale: 0, operation: Operation.DIRECT },
-        STORAGE_CONTROL_MODE: { type: MRType.HOLDING, addr: 43110, len: 1, dtype: 'UINT16', scale: 0, capability: 'storage_control_mode', operation: Operation.STORAGE_CONTROL },
-        ALLOW_GRIDCHARGE: { type: MRType.HOLDING, addr: 43110, len: 1, dtype: 'UINT16', scale: 0, capability: 'storage_allow_gridcharge', operation: Operation.ALLOW_GRIDCHARGE },
-        STORAGE_WORKING_MODE: { type: MRType.INPUT, addr: 33122, len: 1, dtype: 'UINT16', scale: 0, capability: 'storage_working_mode', operation: Operation.TOSTRING },
-        FORCE_CHARGE_SOURCE: { type: MRType.HOLDING, addr: 43028, len: 1, dtype: 'UINT16', scale: 0, capability: 'force_charge_source', operation: Operation.TOSTRING },
-        FORCE_CHARGE_LIMIT: { type: MRType.HOLDING, addr: 43027, len: 1, dtype: 'UINT16', scale: 1, capability: 'measure_power.force_charge_limit', operation: Operation.DIRECT },
-        FORCE_CHARGE_POWER: { type: MRType.HOLDING, addr: 43136, len: 1, dtype: 'UINT16', scale: 1, capability: 'measure_power.force_charge_power', operation: Operation.DIRECT },
-        FORCE_DISCHARGE_POWER: { type: MRType.HOLDING, addr: 43129, len: 1, dtype: 'UINT16', scale: 1, capability: 'measure_power.force_discharge_power', operation: Operation.DIRECT },
-        FORCE_CHARGE_DIRECTION: { type: MRType.HOLDING, addr: 43135, len: 1, dtype: 'UINT16', scale: 0, capability: 'force_charge_direction', operation: Operation.TOSTRING },
+    batteryRegisters: Record<string, MonitoredRegister> = {
+        BATTERY_POWER: { reg: { type: MRType.INPUT, addr: 33149, len: 2, dtype: 'INT32', scale: 0, capability: 'measure_power.batt_power', operation: Operation.DIRECT }, pollRate: PollRate.PRIO1 },
+        BATTERY: { reg: { type: MRType.INPUT, addr: 33139, len: 1, dtype: 'UINT16', scale: 0, capability: 'battery', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        MEASURE_BATTERY: { reg: { type: MRType.INPUT, addr: 33139, len: 1, dtype: 'UINT16', scale: 0, capability: 'measure_battery', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        STORAGE_CURRENT_DAY_CHARGE_CAPACITY: { reg: { type: MRType.INPUT, addr: 33163, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT }, pollRate: PollRate.PRIO4 },
+        STORAGE_CURRENT_DAY_DISCHARGE_CAPACITY: { reg: { type: MRType.INPUT, addr: 33167, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT }, pollRate: PollRate.PRIO4 },
+        STORAGE_TOTAL_CHARGE: { reg: { type: MRType.INPUT, addr: 33161, len: 2, dtype: 'UINT32', scale: 0, operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        STORAGE_TOTAL_DISCHARGE: { reg: { type: MRType.INPUT, addr: 33165, len: 2, dtype: 'UINT32', scale: 0, operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        STORAGE_MAXIMUM_CHARGE_POWER: { reg: { type: MRType.HOLDING, addr: 43012, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.chargesetting', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        STORAGE_MAXIMUM_DISCHARGE_POWER: { reg: { type: MRType.HOLDING, addr: 43013, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.dischargesetting', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        STORAGE_RATED_CAPACITY: { reg: { type: MRType.INPUT, addr: 43019, len: 1, dtype: 'UINT16', scale: 0, operation: Operation.DIRECT }, pollRate: PollRate.PRIO4 },
+        STORAGE_CONTROL_MODE: { reg: { type: MRType.HOLDING, addr: 43110, len: 1, dtype: 'UINT16', scale: 0, capability: 'storage_control_mode', operation: Operation.STORAGE_CONTROL }, pollRate: PollRate.PRIO1 },
+        ALLOW_GRIDCHARGE: { reg: { type: MRType.HOLDING, addr: 43110, len: 1, dtype: 'UINT16', scale: 0, capability: 'storage_allow_gridcharge', operation: Operation.ALLOW_GRIDCHARGE }, pollRate: PollRate.PRIO1 },
+        STORAGE_WORKING_MODE: { reg: { type: MRType.INPUT, addr: 33122, len: 1, dtype: 'UINT16', scale: 0, capability: 'storage_working_mode', operation: Operation.TOSTRING }, pollRate: PollRate.PRIO1 },
+        FORCE_CHARGE_SOURCE: { reg: { type: MRType.HOLDING, addr: 43028, len: 1, dtype: 'UINT16', scale: 0, capability: 'force_charge_source', operation: Operation.TOSTRING }, pollRate: PollRate.PRIO1 },
+        FORCE_CHARGE_LIMIT: { reg: { type: MRType.HOLDING, addr: 43027, len: 1, dtype: 'UINT16', scale: 1, capability: 'measure_power.force_charge_limit', operation: Operation.DIRECT }, pollRate: PollRate.PRIO1 },
+        FORCE_CHARGE_POWER: { reg: { type: MRType.HOLDING, addr: 43136, len: 1, dtype: 'UINT16', scale: 1, capability: 'measure_power.force_charge_power', operation: Operation.DIRECT }, pollRate: PollRate.PRIO1 },
+        FORCE_DISCHARGE_POWER: { reg: { type: MRType.HOLDING, addr: 43129, len: 1, dtype: 'UINT16', scale: 1, capability: 'measure_power.force_discharge_power', operation: Operation.DIRECT }, pollRate: PollRate.PRIO1 },
+        FORCE_CHARGE_DIRECTION: { reg: { type: MRType.HOLDING, addr: 43135, len: 1, dtype: 'UINT16', scale: 0, capability: 'force_charge_direction', operation: Operation.TOSTRING }, pollRate: PollRate.PRIO1 },
     };
 
     static applyOperation(measurement: Measurement, operation: Operation): number | string {
@@ -306,15 +314,17 @@ export class Solis extends Homey.Device {
 
     }
 
-    async setForceChargeCapability(result: Record<string, Measurement>): Promise<void> {
+    async updateForceChargeCapability(result: Record<string, Measurement>): Promise<void> {
         const chargeSource = result.FORCE_CHARGE_SOURCE?.value;
         const chargeLimit = result.FORCE_CHARGE_LIMIT?.value;
         const chargePower = result.FORCE_CHARGE_POWER?.value;
         const dischargePower = result.FORCE_DISCHARGE_POWER?.value;
         const chargeDirection = result.FORCE_CHARGE_DIRECTION?.value;
+        const peakShavingPower = result.PEAK_SHAVING_MAX_GRID_POWER?.value;
         const storageControlMode: StorageControlMode = Number.parseInt(result.STORAGE_CONTROL_MODE?.value, 10);
 
-        const isPeakShaving = (storageControlMode & StorageControlMode.PEAK_SHAVING) === StorageControlMode.PEAK_SHAVING;
+        const isForceBatteryCharge = storageControlMode & StorageControlMode.BATTERY_FORCE_CHARGE_PEAK_SHAVING;
+        const isPeakShaving = peakShavingPower !== '0';
         const hasChargeLimit = chargeLimit !== '0';
         const isCharging = chargeSource === '1' && chargeDirection === '1' && chargePower !== '0' && dischargePower === '0' && hasChargeLimit;
         const isDischarging = chargeSource === '1' && chargeDirection === '2' && dischargePower !== '0' && chargePower === '0' && hasChargeLimit;
@@ -322,20 +332,16 @@ export class Solis extends Homey.Device {
 
         let mode = ForceBatteryChargeMode.OFF;
 
-        if (isDischarging && isPeakShaving) {
-            mode = ForceBatteryChargeMode.PEAKSHAVING;
-        }
-
-        if (isCharging && !isPeakShaving) {
-            mode = ForceBatteryChargeMode.CHARGE;
-        }
-
-        if (isDischarging && !isPeakShaving) {
-            mode = ForceBatteryChargeMode.DISCHARGE;
-        }
-
-        if (isIdle && !isPeakShaving) {
-            mode = ForceBatteryChargeMode.IDLE;
+        if (isForceBatteryCharge) {
+            if (isDischarging && isPeakShaving) {
+                mode = ForceBatteryChargeMode.PEAKSHAVING;
+            } else if (isCharging && !isPeakShaving) {
+                mode = ForceBatteryChargeMode.CHARGE;
+            } else if (isDischarging && !isPeakShaving) {
+                mode = ForceBatteryChargeMode.DISCHARGE;
+            } else if (isIdle && !isPeakShaving) {
+                mode = ForceBatteryChargeMode.IDLE;
+            }
         }
 
         console.log('=== Determined force charge mode:', mode);
@@ -344,7 +350,7 @@ export class Solis extends Homey.Device {
         await this.setCapabilityValue('force_battery_charge_mode', `${mode}`);
     }
 
-    async updateSolisRegister(key: string, register: ModbusRegister, client: InstanceType<typeof Modbus.client.TCP>) {
+    async readRegister(key: string, register: ModbusRegister, client: InstanceType<typeof Modbus.client.TCP>) {
         const measurement = await read(register, client);
         await this.addCapability(register.capability!);
         const value = Solis.applyOperation(measurement, register.operation);
@@ -353,5 +359,200 @@ export class Solis extends Homey.Device {
         await HelperService.delay(10);
 
         return measurement;
+    }
+
+    async registerListeners(client: InstanceType<typeof Modbus.client.TCP>) {
+        // homey menu / device actions
+        this.registerCapabilityListener('storage_control_mode', async (value) => {
+            await this.handleEvents(client, 'storage_control_mode', Number(value));
+            return value;
+        });
+
+        this.registerCapabilityListener('storage_working_mode', async (value) => {
+            await this.handleEvents(client, 'storage_working_mode', Number(value));
+            return value;
+        });
+
+        this.registerCapabilityListener('force_battery_charge_mode', async (value) => {
+            await this.handleEvents(client, 'force_battery_charge_mode', Number(value));
+            return value;
+        });
+
+        this.registerCapabilityListener('peak_shaving_max_grid_power', async (value) => {
+            await this.handleEvents(client, 'peak_shaving_max_grid_power', Number(value));
+            return value;
+        });
+
+        const changedStorageWorkingmode = this.homey.flow.getConditionCard('changedstorage_working_mode');
+        changedStorageWorkingmode.registerRunListener(async (args, state) => {
+            this.log(`changedstorage_working_mode  storage_working_mode_main ${args.device.getCapabilityValue('storage_working_mode_main')}`);
+            this.log(`changedstorage_working_mode  argument_main ${args.argument_main}`);
+            const result = (await args.device.getCapabilityValue('storage_working_mode_main')) === args.argument_main;
+            return Promise.resolve(result);
+        });
+
+        const changedStorageControlmode = this.homey.flow.getConditionCard('changedstorage_control_mode');
+        changedStorageControlmode.registerRunListener(async (args, state) => {
+            this.log(`changedstorage_control_mode  storage_control_mode_main ${args.device.getCapabilityValue('storage_control_mode_main')}`);
+            this.log(`changedstorage_control_mode  argument_main ${args.argument_main}`);
+            const result = (await args.device.getCapabilityValue('storage_control_mode_main')) === args.argument_main;
+            return Promise.resolve(result);
+        });
+
+        const changedForceBatteryCharge = this.homey.flow.getConditionCard('changedforce_battery_charge_mode');
+        changedForceBatteryCharge.registerRunListener(async (args, state) => {
+            this.log(`changedforce_battery_charge_mode  force_battery_charge_mode_main ${args.device.getCapabilityValue('force_battery_charge_mode_main')}`);
+            this.log(`changedforce_battery_charge_mode  argument_main ${args.argument_main}`);
+            const result = (await args.device.getCapabilityValue('force_battery_charge_mode_main')) === args.argument_main;
+            return Promise.resolve(result);
+        });
+
+        const changedPeakShavingMaxGridPower = this.homey.flow.getConditionCard('changedpeak_shaving_max_grid_power');
+        changedPeakShavingMaxGridPower.registerRunListener(async (args, state) => {
+            this.log(`changedpeak_shaving_max_grid_power  peak_shaving_max_grid_power ${args.device.getCapabilityValue('peak_shaving_max_grid_power')}`);
+            this.log(`changedpeak_shaving_max_grid_power  argument_main ${args.argument_main}`);
+            const result = (await args.device.getCapabilityValue('peak_shaving_max_grid_power')) === args.argument_main;
+            return Promise.resolve(result);
+        });
+
+    }
+
+    private async rewriteChargeModeSetting(client: InstanceType<typeof Modbus.client.TCP>) {
+        try {
+            await write(this.batteryRegisters.FORCE_CHARGE_LIMIT.reg, client, 5000);
+            await write(this.batteryRegisters.FORCE_CHARGE_SOURCE.reg, client, 1);
+
+            if (this.chargeMode === ForceBatteryChargeMode.CHARGE) {
+                console.log('= Setting CHARGE mode');
+                await write(this.inverterRegisters.PASSIVE_MODE.reg, client, PassiveMode.ON);
+                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg, client, StorageControlMode.PEAK_SHAVING);
+                await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg, client, 5000);
+                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg, client, ForceBatteryChargeDirection.CHARGE);
+                await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg, client, 0);
+            } else if (this.chargeMode === ForceBatteryChargeMode.DISCHARGE) {
+                console.log('= Setting DISCHARGE mode');
+                await write(this.inverterRegisters.PASSIVE_MODE.reg, client, PassiveMode.ON);
+                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg, client, StorageControlMode.BATTERY_FORCE_CHARGE_PEAK_SHAVING);
+                await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg, client, 0);
+                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg, client, ForceBatteryChargeDirection.DISCHARGE);
+                await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg, client, 5000);
+            } else if (this.chargeMode === ForceBatteryChargeMode.PEAKSHAVING) {
+                console.log('= Setting PEAKSHAVING mode');
+                await write(this.inverterRegisters.PASSIVE_MODE.reg, client, PassiveMode.ON);
+                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg, client, StorageControlMode.BATTERY_FORCE_CHARGE_PEAK_SHAVING);
+                await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg, client, 0);
+                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg, client, ForceBatteryChargeDirection.DISCHARGE);
+                await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg, client, 5000);
+            } else if (this.chargeMode === ForceBatteryChargeMode.IDLE) {
+                console.log('= Setting IDLE mode');
+                await write(this.inverterRegisters.PASSIVE_MODE.reg, client, PassiveMode.ON);
+                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg, client, StorageControlMode.BATTERY_FORCE_CHARGE_PEAK_SHAVING);
+                await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg, client, 0);
+                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg, client, ForceBatteryChargeDirection.DISCHARGE);
+                await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg, client, 0);
+            } else {
+                await write(this.inverterRegisters.PASSIVE_MODE.reg, client, PassiveMode.OFF);
+                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg, client, StorageControlMode.SELF_USE_MODE | StorageControlMode.ALLOW_GRID_CHARGE);
+            }
+
+            await HelperService.delay(1000);
+
+            const storageControlMode = await this.readRegister('STORAGE_CONTROL_MODE', this.batteryRegisters.STORAGE_CONTROL_MODE.reg, client);
+            const storageWorkingMode = await this.readRegister('STORAGE_WORKING_MODE', this.batteryRegisters.STORAGE_WORKING_MODE.reg, client);
+            const peakPower = await this.readRegister('PEAK_SHAVING_MAX_GRID_POWER', this.inverterRegisters.PEAK_SHAVING_MAX_GRID_POWER.reg, client);
+            const forceChargePower = await this.readRegister('FORCE_CHARGE_POWER', this.batteryRegisters.FORCE_CHARGE_POWER.reg, client);
+            const forceChargeDirection = await this.readRegister('FORCE_CHARGE_DIRECTION', this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg, client);
+            const forceDischargePower = await this.readRegister('FORCE_DISCHARGE_POWER', this.batteryRegisters.FORCE_DISCHARGE_POWER.reg, client);
+            const forceChargeSource = await this.readRegister('FORCE_CHARGE_SOURCE', this.batteryRegisters.FORCE_CHARGE_SOURCE.reg, client);
+            const forceChargeLimit = await this.readRegister('FORCE_CHARGE_LIMIT', this.batteryRegisters.FORCE_CHARGE_LIMIT.reg, client);
+
+            const result = {
+                STORAGE_CONTROL_MODE: storageControlMode,
+                STORAGE_WORKING_MODE: storageWorkingMode,
+                PEAK_SHAVING_MAX_GRID_POWER: peakPower,
+                FORCE_CHARGE_POWER: forceChargePower,
+                FORCE_CHARGE_DIRECTION: forceChargeDirection,
+                FORCE_DISCHARGE_POWER: forceDischargePower,
+                FORCE_CHARGE_SOURCE: forceChargeSource,
+                FORCE_CHARGE_LIMIT: forceChargeLimit,
+            };
+
+            this.updateForceChargeCapability(result);
+
+        } catch (error) {
+            console.error('Error updating force battery charge mode:', error);
+        }
+    }
+
+    async handleEvents(client: InstanceType<typeof Modbus.client.TCP>, type: string, value: number) {
+        if (type === 'storage_control_mode') {
+            const storageControlMode: StorageControlMode = value;
+            await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg, client, storageControlMode);
+            console.log('storage_working_mode', storageControlMode);
+        }
+
+        if (type === 'force_battery_charge_mode') {
+            this.chargeMode = value as ForceBatteryChargeMode;
+            console.log('= Setting force battery mode to: ', ForceBatteryChargeMode[this.chargeMode]);
+            await this.rewriteChargeModeSetting(client);
+        }
+
+        if (type === 'peak_shaving_max_grid_power') {
+            console.log('= Setting max peak shaving grid power to: ', value);
+            await write(this.inverterRegisters.PEAK_SHAVING_MAX_GRID_POWER.reg, client, value);
+        }
+    }
+
+    async poll(client: InstanceType<typeof Modbus.client.TCP>, registers: Record<string, MonitoredRegister>, active: () => boolean) {
+        const highestPollRate = min(filter(values(PollRate), isNumber)) || PollRate.PRIO4;
+
+        let accumulatedTime = 0;
+        const results: Record<string, Measurement> = {};
+
+        while (active()) {
+            const startTime = new Date();
+
+            for (const key of Object.keys(registers)) {
+                const register = registers[key];
+                const shouldPoll = (accumulatedTime % register.pollRate) === 0;
+                if (!shouldPoll) {
+                    continue;
+                }
+
+                try {
+                    const result = await this.readRegister(key, register.reg, client);
+                    results[key] = result;
+                } catch (error) {
+                    this.log(`error updating register ${register.reg.addr} - ${(error as Error).message}`);
+                }
+
+            }
+
+            try {
+                await this.updateForceChargeCapability(results);
+            } catch (error) {
+                this.log('error updating force charge capability!', (error as Error).message);
+            }
+
+            if ((accumulatedTime % 60) === 0) {
+                try {
+                    if (this.chargeMode !== ForceBatteryChargeMode.OFF) {
+                        console.log('=== Rewriting force charge ===');
+                        await this.rewriteChargeModeSetting(client);
+                    }
+                } catch (error) {
+                    this.log('error rewriting charge mode setting!', (error as Error).message);
+                }
+            }
+
+            const endTime = new Date();
+            const timeDiff = endTime.getTime() - startTime.getTime();
+            const seconds = Math.floor(timeDiff / 1000);
+            this.log(`total time: ${seconds} seconds`);
+
+            accumulatedTime += highestPollRate;
+            await HelperService.delay(highestPollRate * 1000);
+        }
+
     }
 }

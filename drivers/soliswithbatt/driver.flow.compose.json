@@ -2,6 +2,33 @@
   "triggers": [],
   "conditions": [
     {
+      "id": "changedpeak_shaving_max_grid_power",
+      "title": {
+        "en": "Peak shaving max grid power is"
+      },
+      "titleFormatted": {
+        "en": "Peak shaving max grid power is [[argument_main]]"
+      },
+      "hint": {
+        "en": "The current Peak shaving max grid power"
+      },
+      "args": [
+        {
+          "type": "number",
+          "name": "argument_main",
+          "title": {
+            "en": "Peak shaving max grid power (W)"
+          },
+          "placeholder": {
+            "en": "1000"
+          },
+          "min": 0,
+          "max": 10000,
+          "step": 200
+        }
+      ]
+    },
+    {
       "id": "changedforce_battery_charge_mode",
       "title": {
         "en": "Force battery charge mode is"

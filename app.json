@@ -612,6 +612,38 @@
         "id": "start_stop"
       },
       {
+        "id": "changedpeak_shaving_max_grid_power",
+        "title": {
+          "en": "Peak shaving max grid power is"
+        },
+        "titleFormatted": {
+          "en": "Peak shaving max grid power is [[argument_main]]"
+        },
+        "hint": {
+          "en": "The current Peak shaving max grid power"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=soliswithbatt"
+          },
+          {
+            "type": "number",
+            "name": "argument_main",
+            "title": {
+              "en": "Peak shaving max grid power (W)"
+            },
+            "placeholder": {
+              "en": "1000"
+            },
+            "min": 0,
+            "max": 10000,
+            "step": 200
+          }
+        ]
+      },
+      {
         "id": "changedforce_battery_charge_mode",
         "title": {
           "en": "Force battery charge mode is"
@@ -1585,9 +1617,9 @@
         "measure_power.force_charge_power",
         "measure_power.force_discharge_power",
         "force_charge_direction",
-        "measure_power.peak_shaving_max_grid_power",
         "measure_power.grid",
-        "passive_mode"
+        "passive_mode",
+        "peak_shaving_max_grid_power"
       ],
       "capabilitiesOptions": {
         "measure_power": {
@@ -1748,7 +1780,7 @@
             "en": "Force discharge power"
           }
         },
-        "measure_power.peak_shaving_max_grid_power": {
+        "peak_shaving_max_grid_power": {
           "title": {
             "en": "Peak shaving max grid power"
           }
@@ -3113,6 +3145,21 @@
           }
         }
       ]
+    },
+    "peak_shaving_max_grid_power": {
+      "type": "number",
+      "title": {
+        "en": "Peak shaving max grid power"
+      },
+      "uiComponent": "slider",
+      "getable": true,
+      "setable": true,
+      "units": {
+        "en": "W"
+      },
+      "min": 0,
+      "max": 10000,
+      "step": 200
     },
     "period1": {
       "type": "string",

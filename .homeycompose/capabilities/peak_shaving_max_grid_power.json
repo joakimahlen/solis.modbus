@@ -1,0 +1,15 @@
+{
+  "type": "number",
+  "title": {
+    "en": "Peak shaving max grid power"
+  },
+  "uiComponent": "slider",
+  "getable": true,
+  "setable": true,
+  "units": {
+    "en": "W"
+  },
+  "min": 0,
+  "max": 10000,
+  "step": 200
+}
