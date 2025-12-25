@@ -1,8 +1,11 @@
 {
   "type": "number",
   "title": {
-    "en": "Passive mode is"
+    "en": "TOU Slots Active"
   },
+  "insights": false,
+  "min": 0,
+  "max": 100,
   "getable": true,
   "setable": false,
   "uiComponent": "sensor"

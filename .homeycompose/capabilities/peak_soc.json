@@ -1,0 +1,19 @@
+{
+  "type": "number",
+  "title": {
+    "en": "Peak SOC"
+  },
+  "units": {
+    "en": "%"
+  },
+  "min": 0,
+  "max": 100,
+  "desc": {
+    "en": "Peak shaving SOC in percentage (%)"
+  },
+  "chartType": "spline",
+  "decimals": 0,
+  "getable": true,
+  "setable": true,
+  "uiComponent": "slider"
+}

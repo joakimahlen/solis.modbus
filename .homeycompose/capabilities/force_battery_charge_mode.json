@@ -9,33 +9,39 @@
   "uiQuickAction": false,
   "values": [
     {
+      "id": "-1",
+      "title": {
+        "en": "Unknown"
+      }
+    },
+    {
       "id": "0",
       "title": {
-        "en": "Off"
+        "en": "Self-use"
       }
     },
     {
       "id": "1",
       "title": {
-        "en": "Charge"
+        "en": "Peak shaving"
       }
     },
     {
       "id": "2",
       "title": {
-        "en": "Discharge"
+        "en": "Charge"
       }
     },
     {
       "id": "3",
       "title": {
-        "en": "Idle"
+        "en": "Discharge"
       }
     },
     {
       "id": "4",
       "title": {
-        "en": "Peak-shaving"
+        "en": "Idle"
       }
     }
   ]

@@ -1,0 +1,55 @@
+{
+  "title": {
+    "en": "Force battery charge mode is"
+  },
+  "titleFormatted": {
+    "en": "Force battery charge is [[argument_main]]"
+  },
+  "hint": {
+    "en": "The current Force battery charge mode"
+  },
+  "args": [
+    {
+      "name": "argument_main",
+      "type": "dropdown",
+      "values": [
+        {
+          "id": "-1",
+          "title": {
+            "en": "Unknown"
+          }
+        },
+        {
+          "id": "0",
+          "title": {
+            "en": "Self-use"
+          }
+        },
+        {
+          "id": "1",
+          "title": {
+            "en": "Peak shaving"
+          }
+        },
+        {
+          "id": "2",
+          "title": {
+            "en": "Charge"
+          }
+        },
+        {
+          "id": "3",
+          "title": {
+            "en": "Discharge"
+          }
+        },
+        {
+          "id": "4",
+          "title": {
+            "en": "Idle"
+          }
+        }
+      ]
+    }
+  ]
+}

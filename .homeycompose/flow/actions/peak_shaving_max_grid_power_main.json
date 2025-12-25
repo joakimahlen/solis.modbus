@@ -1,0 +1,29 @@
+{
+  "id": "changedpeak_shaving_max_grid_power",
+  "title": {
+    "en": "Set peak shaving max grid power"
+  },
+  "titleFormatted": {
+    "en": "Set peak shaving max grid power to [[argument_main]]"
+  },
+  "args": [
+    {
+      "type": "number",
+      "name": "argument_main",
+      "title": {
+        "en": "Peak shaving max grid power (W)"
+      },
+      "placeholder": {
+        "en": "1000"
+      },
+      "min": 0,
+      "max": 10000,
+      "step": 200
+    },
+    {
+      "type": "device",
+      "name": "device",
+      "filter": "driver_id=solis|soliswithbatt"
+    }
+  ]
+}

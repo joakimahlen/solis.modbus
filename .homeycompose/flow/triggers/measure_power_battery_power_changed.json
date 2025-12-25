@@ -7,10 +7,7 @@
     {
       "name": "measure_power.batt_power",
       "title": {
-        "en": "Power",
-        "nl": "Vermogen",
-        "de": "Leistung",
-        "sv": "Effekt"
+        "en": "Power"
       },
       "type": "number",
       "example": 100

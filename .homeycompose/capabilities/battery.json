@@ -1,9 +1,7 @@
 {
   "type": "number",
   "title": {
-    "en": "Battery",
-    "nl": "Accuniveau",
-    "de": "Batteriestand"
+    "en": "Battery"
   },
   "insights": false,
   "icon": "/assets/battery.svg",
@@ -13,9 +11,7 @@
   "min": 0,
   "max": 100,
   "desc": {
-    "en": "Battery charge in percentage (%)",
-    "nl": "Accuniveau in procenten (%)",
-    "de": "Batteriestand in Prozent (%)"
+    "en": "Battery charge in percentage (%)"
   },
   "chartType": "spline",
   "decimals": 2,

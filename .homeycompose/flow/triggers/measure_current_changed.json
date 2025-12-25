@@ -1,18 +1,12 @@
 {
   "title": {
-    "en": "The electric current changed",
-    "nl": "De elektrische stroom is veranderd",
-    "de": "Strom hat sich verändert",
-    "sv": "Strömmen har ändrats"
+    "en": "The electric current changed"
   },
   "tokens": [
     {
       "name": "measure_current",
       "title": {
-        "en": "Current",
-        "nl": "Stroom",
-        "de": "Strom",
-        "sv": "Ström"
+        "en": "Current"
       },
       "type": "number",
       "example": 7.5

@@ -1,24 +1,10 @@
 {
-  "type": "enum",
+  "type": "number",
   "title": {
     "en": "Force battery charge source is"
   },
+  "decimals": 0,
   "getable": true,
   "setable": false,
-  "uiComponent": "sensor",
-  "uiQuickAction": false,
-  "values": [
-    {
-      "id": "0",
-      "title": {
-        "en": "Charge only from grid"
-      }
-    },
-    {
-      "id": "1",
-      "title": {
-        "en": "Charge from PV and grid"
-      }
-    }
-  ]
+  "uiComponent": "sensor"
 }

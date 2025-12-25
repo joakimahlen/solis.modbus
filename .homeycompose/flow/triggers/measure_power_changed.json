@@ -1,19 +1,13 @@
 {
   "highlight": true,
   "title": {
-    "en": "The solar power changed",
-    "nl": "Het solar vermogen is veranderd",
-    "de": "Solarleistung hat sich geändert",
-    "sv": "Soleffekten har ändrats"
+    "en": "The solar power changed"
   },
   "tokens": [
     {
       "name": "measure_power",
       "title": {
-        "en": "Power",
-        "nl": "Vermogen",
-        "de": "Leistung",
-        "sv": "Effekt"
+        "en": "Power"
       },
       "type": "number",
       "example": 100

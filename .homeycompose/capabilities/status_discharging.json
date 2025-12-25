@@ -1,7 +1,0 @@
-{
-  "type": "boolean",
-  "title": { "en": "Discharging" },
-  "getable": true,
-  "setable": false,
-  "uiComponent": "toggle"
-}

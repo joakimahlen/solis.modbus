@@ -1,7 +1,7 @@
 {
   "type": "enum",
   "title": {
-    "en": "Storage working mode"
+    "en": "Operating mode"
   },
   "getable": true,
   "setable": false,
@@ -60,6 +60,48 @@
       "id": "256",
       "title": {
         "en": "Passive"
+      }
+    },
+    {
+      "id": "512",
+      "title": {
+        "en": "Reserved 9"
+      }
+    },
+    {
+      "id": "1024",
+      "title": {
+        "en": "Reserved 10"
+      }
+    },
+    {
+      "id": "2048",
+      "title": {
+        "en": "Reserved 11"
+      }
+    },
+    {
+      "id": "4096",
+      "title": {
+        "en": "Reserved 12"
+      }
+    },
+    {
+      "id": "8192",
+      "title": {
+        "en": "Reserved 13"
+      }
+    },
+    {
+      "id": "16384",
+      "title": {
+        "en": "Reserved 14"
+      }
+    },
+    {
+      "id": "32768",
+      "title": {
+        "en": "Reserved 15"
       }
     }
   ]

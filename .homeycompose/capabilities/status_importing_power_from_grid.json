@@ -1,7 +1,0 @@
-{
-  "type": "boolean",
-  "title": { "en": "Importing power from grid" },
-  "getable": true,
-  "setable": false,
-  "uiComponent": "toggle"
-}

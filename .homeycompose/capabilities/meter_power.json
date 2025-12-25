@@ -1,18 +1,14 @@
 {
   "type": "number",
   "title": {
-    "en": "Total Yield",
-    "nl": "Totale opbrengst",
-    "de": "Gesamtertrag"
+    "en": "Total Yield"
   },
   "decimals": 2,
   "units": {
     "en": "kWh"
   },
   "desc": {
-    "en": "Energy usage in kilowatt-hour (kWh)",
-    "nl": "Energie verbruik in kilowattuur (kWh)",
-    "de": "Verbrauchte Energie in Kilowattstunden (kWh)"
+    "en": "Energy usage in kilowatt-hour (kWh)"
   },
   "chartType": "spline",
   "insights": true,

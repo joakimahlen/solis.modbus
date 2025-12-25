@@ -1,7 +1,0 @@
-{
-  "type": "boolean",
-  "title": { "en": "Power generated from PV" },
-  "getable": true,
-  "setable": false,
-  "uiComponent": "toggle"
-}
