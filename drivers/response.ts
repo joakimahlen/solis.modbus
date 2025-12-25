@@ -20,10 +20,9 @@ export async function rawWrite(register: ModbusRegister, client: InstanceType<ty
 export async function write(register: ModbusRegister, client: InstanceType<typeof Modbus.client.TCP>, value: number): Promise<void> {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      console.log(`= Attempting write ${attempt}/3...`);
       return await rawWrite(register, client, value);
     } catch (error) {
-      console.log(`= write attempt ${attempt} failed for reg ${register.addr}: ${error}`);
+      console.log(`= write attempt ${attempt} failed for reg ${register.addr}: ${(error as Error).message}`);
       if (attempt === 3) {
         throw error;
       }
@@ -48,6 +47,7 @@ export async function read(register: ModbusRegister, client: InstanceType<typeof
   const { response } = actualRes;
   const measurement: Measurement = {
     value: 'xxx',
+    computedValue: 'xxx',
     scale: register.scale,
     operation: register.operation,
     capability: register.capability!,

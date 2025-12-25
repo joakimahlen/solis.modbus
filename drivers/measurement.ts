@@ -5,4 +5,5 @@ export interface Measurement {
     scale: number;
     operation: Operation;
     capability: string;
+    computedValue: string | number;
 }

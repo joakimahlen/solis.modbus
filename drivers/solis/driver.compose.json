@@ -10,13 +10,6 @@
   },
   "capabilities": [
     "measure_power",
-    "measure_power.active_power",
-    "measure_current.phase1",
-    "measure_current.phase2",
-    "measure_current.phase3",
-    "measure_voltage.phase1",
-    "measure_voltage.phase2",
-    "measure_voltage.phase3",
     "measure_power.grid_phase1",
     "measure_power.grid_phase2",
     "measure_power.grid_phase3",
@@ -24,63 +17,21 @@
     "meter_power",
     "meter_power.daily",
     "measure_voltage",
-    "measure_voltage.pv1",
-    "measure_voltage.pv2",
-    "measure_voltage.pv3",
-    "measure_voltage.pv4",
-    "measure_current.pv1",
-    "measure_current.pv2",
-    "measure_current.pv3",
-    "measure_current.pv4",
+    "measure_power.pv",
+    "measure_power.pv1",
+    "measure_power.pv2",
+    "measure_power.pv3",
+    "measure_power.pv4",
+    "measure_power.house_load",
     "solis_status",
-    "solis_model"
+    "solis_model",
+    "tou_slots"
   ],
   "capabilitiesOptions": {
     "measure_power": {
       "decimals": 0,
       "title": {
-        "en": "Solar Power"
-      }
-    },
-    "measure_power.active_power": {
-      "decimals": 0,
-      "title": {
         "en": "Active Power"
-      }
-    },
-    "measure_current.phase1": {
-      "title": {
-        "en": "Grid Current phase1"
-      }
-    },
-    "measure_current.phase2": {
-      "title": {
-        "en": "Grid Current phase2"
-      }
-    },
-    "measure_current.phase3": {
-      "title": {
-        "en": "Grid Current phase3"
-      }
-    },
-    "measure_current.pv1": {
-      "title": {
-        "en": "PV1 Current"
-      }
-    },
-    "measure_current.pv2": {
-      "title": {
-        "en": "PV2 Current"
-      }
-    },
-    "measure_current.pv3": {
-      "title": {
-        "en": "PV3 Current"
-      }
-    },
-    "measure_current.pv4": {
-      "title": {
-        "en": "PV4 Current"
       }
     },
     "measure_voltage": {
@@ -88,39 +39,35 @@
         "en": "Voltage"
       }
     },
-    "measure_voltage.phase1": {
+    "measure_power.pv": {
       "title": {
-        "en": "Grid Voltage phase1"
+        "en": "PV Power"
       }
     },
-    "measure_voltage.phase2": {
+    "measure_power.pv1": {
       "title": {
-        "en": "Grid Voltage phase2"
+        "en": "PV1 Power"
       }
     },
-    "measure_voltage.phase3": {
+    "measure_power.pv2": {
       "title": {
-        "en": "Grid Voltage phase3"
+        "en": "PV1 Power"
       }
     },
-    "measure_voltage.pv1": {
+    "measure_power.pv3": {
       "title": {
-        "en": "PV1 Voltage"
+        "en": "PV1 Power"
       }
     },
-    "measure_voltage.pv2": {
+    "measure_power.pv4": {
       "title": {
-        "en": "PV2 Voltage"
+        "en": "PV1 Power"
       }
     },
-    "measure_voltage.pv3": {
+    "measure_power.house_load": {
+      "decimals": 0,
       "title": {
-        "en": "PV3 Voltage"
-      }
-    },
-    "measure_voltage.pv4": {
-      "title": {
-        "en": "PV4 Voltage"
+        "en": "House Load Power"
       }
     },
     "measure_temperature.inverter": {
@@ -153,6 +100,11 @@
         "en": "Inverter model"
       },
       "icon": "/assets/operational_status.svg"
+    },
+    "tou_slots": {
+      "title": {
+        "en": "TOU Slots Active"
+      }
     }
   },
   "platforms": [
