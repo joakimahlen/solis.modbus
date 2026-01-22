@@ -1,17 +1,17 @@
 {
-  "id": "peak_shaving_max_grid_power_main",
+  "id": "changedforce_battery_discharge_power",
   "title": {
-    "en": "Set peak shaving max grid power"
+    "en": "Set force battery discharge power"
   },
   "titleFormatted": {
-    "en": "Set peak shaving max grid power to [[argument_main]]"
+    "en": "Set force battery discharge power to [[argument_main]]"
   },
   "args": [
     {
       "type": "number",
       "name": "argument_main",
       "title": {
-        "en": "Peak shaving max grid power (W)"
+        "en": "Force battery discharge power (W)"
       },
       "placeholder": {
         "en": "1000"

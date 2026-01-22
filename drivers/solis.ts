@@ -2,11 +2,11 @@
 import * as HomeyLog from 'homey-log';
 import * as Modbus from 'jsmodbus';
 
-import { filter, isNumber, min, multiply, reduce, sum, values } from 'lodash';
-import Homey from 'homey';
+import { filter, isNil, isNumber, min, multiply, reduce, sum, values } from 'lodash';
 import { read, write } from './response';
 
 import { HelperService } from '../helper';
+import Homey from 'homey';
 import { Measurement } from './measurement';
 
 /* eslint-disable @typescript-eslint/no-misused-promises */
@@ -18,12 +18,12 @@ export enum ForceBatteryChargeMode {
     PEAK_SHAVING = 1,
     CHARGE = 2,
     DISCHARGE = 3,
-    IDLE = 4
+    IDLE = 4,
 }
 
 export enum PassiveMode {
     OFF = 0,
-    ON = 0xaa55
+    ON = 0xaa55,
 }
 
 export enum StorageControlMode {
@@ -38,7 +38,7 @@ export enum StorageControlMode {
     BATTERY_FORCE_CHARGE_PEAK_SHAVING = 256,
     BATTERY_CORRECTION_ENABLE = 512,
     BATTERY_HEALING = 1024,
-    PEAK_SHAVING = 2048
+    PEAK_SHAVING = 2048,
 }
 
 export enum StorageWorkingMode {
@@ -57,18 +57,18 @@ export enum StorageWorkingMode {
     RESERVED12 = 4096,
     RESERVED13 = 8192,
     RESERVED14 = 16384,
-    RESERVED15 = 32768
+    RESERVED15 = 32768,
 }
 
 export enum ForceBatteryChargeDirection {
     OFF = 0,
     CHARGE = 1,
-    DISCHARGE = 2
+    DISCHARGE = 2,
 }
 
 export enum BatteryChargeDirection {
     CHARGE = 0,
-    DISCHARGE = 1
+    DISCHARGE = 1,
 }
 
 export enum ForceBatteryChargeSource {
@@ -78,23 +78,15 @@ export enum ForceBatteryChargeSource {
 
 export const ForceStorageModes: Record<ForceBatteryChargeMode, number> = {
     [ForceBatteryChargeMode.UNKNOWN]: 0,
-    [ForceBatteryChargeMode.SELF_USE]:
-        StorageControlMode.SELF_USE_MODE
-        | StorageControlMode.ALLOW_GRID_CHARGE,
-    [ForceBatteryChargeMode.PEAK_SHAVING]:
-        StorageControlMode.ALLOW_GRID_CHARGE
-        | StorageControlMode.PEAK_SHAVING,
+    [ForceBatteryChargeMode.SELF_USE]: StorageControlMode.SELF_USE_MODE | StorageControlMode.ALLOW_GRID_CHARGE,
+    [ForceBatteryChargeMode.PEAK_SHAVING]: StorageControlMode.ALLOW_GRID_CHARGE | StorageControlMode.PEAK_SHAVING,
     [ForceBatteryChargeMode.CHARGE]:
-        StorageControlMode.SELF_USE_MODE
-        | StorageControlMode.RESERVE_BATTERY
-        | StorageControlMode.ALLOW_GRID_CHARGE
-        | StorageControlMode.BATTERY_FORCE_CHARGE_PEAK_SHAVING,
-    [ForceBatteryChargeMode.DISCHARGE]:
-        StorageControlMode.SELF_USE_MODE
-        | StorageControlMode.BATTERY_FORCE_CHARGE_PEAK_SHAVING,
-    [ForceBatteryChargeMode.IDLE]:
-        StorageControlMode.SELF_USE_MODE
-        | StorageControlMode.BATTERY_FORCE_CHARGE_PEAK_SHAVING,
+        StorageControlMode.SELF_USE_MODE |
+        StorageControlMode.RESERVE_BATTERY |
+        StorageControlMode.ALLOW_GRID_CHARGE |
+        StorageControlMode.BATTERY_FORCE_CHARGE_PEAK_SHAVING,
+    [ForceBatteryChargeMode.DISCHARGE]: StorageControlMode.SELF_USE_MODE | StorageControlMode.BATTERY_FORCE_CHARGE_PEAK_SHAVING,
+    [ForceBatteryChargeMode.IDLE]: StorageControlMode.SELF_USE_MODE | StorageControlMode.BATTERY_FORCE_CHARGE_PEAK_SHAVING,
 };
 
 export const DEVICE_OPERATING_MODES: { [key: string]: string } = {
@@ -223,7 +215,10 @@ export const DEVICE_STATUS_DEFINITIONS: { [key: string]: string } = {
     0x2040: 'EPM Hard Limit Protection',
 };
 
-export enum MRType { HOLDING, INPUT }
+export enum MRType {
+    HOLDING,
+    INPUT,
+}
 
 export enum Operation {
     STATUS,
@@ -242,7 +237,7 @@ export enum PollRate {
     PRIO1 = 10,
     PRIO2 = 60,
     PRIO3 = 120,
-    PRIO4 = 86400
+    PRIO4 = 86400,
 }
 
 export interface ModbusRegister {
@@ -253,7 +248,7 @@ export interface ModbusRegister {
     scale: number;
     capability?: string;
     operation: Operation;
-    settable?: boolean
+    settable?: boolean;
 }
 
 export enum CompoundOperation {
@@ -269,9 +264,10 @@ export interface CompoundRegister {
 }
 
 export interface CustomRegister {
-    handler: (client: InstanceType<typeof Modbus.client.TCP>, value: string | number) => void;
+    getValue: (client: InstanceType<typeof Modbus.client.TCP>) => string | number;
+    setValue?: (client: InstanceType<typeof Modbus.client.TCP>, value: string | number) => void;
     capability: string;
-    settable?: boolean
+    settable?: boolean;
 }
 
 export type BaseRegister = ModbusRegister | CompoundRegister | CustomRegister;
@@ -281,27 +277,68 @@ export interface MonitoredRegister<T extends BaseRegister> {
 }
 
 export const IDLE_RECONNECT_TIMEOUT = 120000; // 120 seconds
+export const FORCE_CHARGE_POWER_LIMIT = 15000; // 15 kW
 
 export class Solis extends Homey.Device {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     homeyLog: any;
-    lastSuccessfulRead = new Date();
     isPolling = false;
 
     async onInit() {
         this.homeyLog = new HomeyLog.Log({ homey: this.homey });
+        this.lastSuccessfulRead = new Date();
+
+        /*
+                                            const oldCapabilities = [
+                                                'measure_power.force_charge_power',
+                                                'measure_power.force_discharge_power',
+                                                'force_charge_power',
+                                                'force_discharge_power',
+                                            ];
+    
+                                            oldCapabilities.forEach(async (oldCapability) => {
+                                                if (this.hasCapability(oldCapability)) {
+                                                    this.log(`======= Removing old capability: ${oldCapability}`);
+                                                    try {
+                                                        await this.removeCapability(oldCapability);
+                                                        this.log(`======= Removed old capability: ${oldCapability}`);
+                                                    } catch (e) {
+                                                        this.log(`======= Error removing old capability: ${oldCapability}`);
+                                                    }
+                                                }
+                                            });
+                                            */
     }
 
-    chargeMode: ForceBatteryChargeMode = ForceBatteryChargeMode.UNKNOWN;
-
     inverterRegisters: Record<string, MonitoredRegister<BaseRegister>> = {
-        ACTIVE_POWER: { reg: { type: MRType.INPUT, addr: 33079, len: 2, dtype: 'INT32', scale: 0, capability: 'measure_power', operation: Operation.INVERT }, pollRate: PollRate.PRIO1 },
-        PHASE_A_POWER: { reg: { type: MRType.INPUT, addr: 33512, len: 1, dtype: 'INT16', scale: 1, capability: 'measure_power.grid_phase1', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
-        PHASE_B_POWER: { reg: { type: MRType.INPUT, addr: 33515, len: 1, dtype: 'INT16', scale: 1, capability: 'measure_power.grid_phase2', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
-        PHASE_C_POWER: { reg: { type: MRType.INPUT, addr: 33518, len: 1, dtype: 'INT16', scale: 1, capability: 'measure_power.grid_phase3', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
-        INTERNAL_TEMPERATURE: { reg: { type: MRType.INPUT, addr: 33093, len: 1, dtype: 'INT16', scale: -1, capability: 'measure_temperature.inverter', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
-        DEVICE_STATUS: { reg: { type: MRType.INPUT, addr: 33095, len: 1, dtype: 'UINT16', scale: 0, capability: 'solis_status', operation: Operation.STATUS }, pollRate: PollRate.PRIO2 },
-        modelName: { reg: { type: MRType.INPUT, addr: 35000, len: 1, dtype: 'UINT16', scale: 0, capability: 'solis_model', operation: Operation.MODEL }, pollRate: PollRate.PRIO4 },
+        ACTIVE_POWER: {
+            reg: { type: MRType.INPUT, addr: 33079, len: 2, dtype: 'INT32', scale: 0, capability: 'measure_power', operation: Operation.INVERT },
+            pollRate: PollRate.PRIO1,
+        },
+        PHASE_A_POWER: {
+            reg: { type: MRType.INPUT, addr: 33512, len: 1, dtype: 'INT16', scale: 1, capability: 'measure_power.grid_phase1', operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO3,
+        },
+        PHASE_B_POWER: {
+            reg: { type: MRType.INPUT, addr: 33515, len: 1, dtype: 'INT16', scale: 1, capability: 'measure_power.grid_phase2', operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO3,
+        },
+        PHASE_C_POWER: {
+            reg: { type: MRType.INPUT, addr: 33518, len: 1, dtype: 'INT16', scale: 1, capability: 'measure_power.grid_phase3', operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO3,
+        },
+        INTERNAL_TEMPERATURE: {
+            reg: { type: MRType.INPUT, addr: 33093, len: 1, dtype: 'INT16', scale: -1, capability: 'measure_temperature.inverter', operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO3,
+        },
+        DEVICE_STATUS: {
+            reg: { type: MRType.INPUT, addr: 33095, len: 1, dtype: 'UINT16', scale: 0, capability: 'solis_status', operation: Operation.STATUS },
+            pollRate: PollRate.PRIO2,
+        },
+        modelName: {
+            reg: { type: MRType.INPUT, addr: 35000, len: 1, dtype: 'UINT16', scale: 0, capability: 'solis_model', operation: Operation.MODEL },
+            pollRate: PollRate.PRIO4,
+        },
         PV1voltage: { reg: { type: MRType.INPUT, addr: 33049, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
         PV1current: { reg: { type: MRType.INPUT, addr: 33050, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
         PV2voltage: { reg: { type: MRType.INPUT, addr: 33051, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
@@ -310,52 +347,308 @@ export class Solis extends Homey.Device {
         PV3current: { reg: { type: MRType.INPUT, addr: 33054, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
         PV4voltage: { reg: { type: MRType.INPUT, addr: 33055, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
         PV4current: { reg: { type: MRType.INPUT, addr: 33056, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
-        PV_POWER: { reg: { type: MRType.INPUT, addr: 33057, len: 2, dtype: 'UINT32', scale: 0, capability: 'measure_power.pv', operation: Operation.DIRECT }, pollRate: PollRate.PRIO1 },
-        PV1_POWER: { reg: { operation: CompoundOperation.MULTIPLY, registers: ['PV1voltage', 'PV1current'], capability: 'measure_power.pv1' }, pollRate: PollRate.PRIO2 },
-        PV2_POWER: { reg: { operation: CompoundOperation.MULTIPLY, registers: ['PV2voltage', 'PV2current'], capability: 'measure_power.pv2' }, pollRate: PollRate.PRIO2 },
-        PV3_POWER: { reg: { operation: CompoundOperation.MULTIPLY, registers: ['PV3voltage', 'PV3current'], capability: 'measure_power.pv3' }, pollRate: PollRate.PRIO2 },
-        PV4_POWER: { reg: { operation: CompoundOperation.MULTIPLY, registers: ['PV4voltage', 'PV4current'], capability: 'measure_power.pv4' }, pollRate: PollRate.PRIO2 },
-        PASSIVE_MODE: { reg: { type: MRType.HOLDING, addr: 43311, len: 1, dtype: 'UINT16', scale: 0, capability: 'passive_mode', operation: Operation.TOSTRING }, pollRate: PollRate.PRIO4 },
-        TOU_SWITCH: { reg: { type: MRType.HOLDING, addr: 43707, len: 1, dtype: 'UINT16', scale: 0, capability: 'tou_slots', operation: Operation.DIRECT }, pollRate: PollRate.PRIO1 },
-        HOUSE_LOAD_POWER: { reg: { type: MRType.INPUT, addr: 33147, len: 1, dtype: 'UINT16', scale: 0, capability: 'measure_power.house_load', operation: Operation.DIRECT }, pollRate: PollRate.PRIO1 },
+        PV_POWER: {
+            reg: { type: MRType.INPUT, addr: 33057, len: 2, dtype: 'UINT32', scale: 0, capability: 'measure_power.pv', operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO1,
+        },
+        PV1_POWER: {
+            reg: { operation: CompoundOperation.MULTIPLY, registers: ['PV1voltage', 'PV1current'], capability: 'measure_power.pv1' },
+            pollRate: PollRate.PRIO2,
+        },
+        PV2_POWER: {
+            reg: { operation: CompoundOperation.MULTIPLY, registers: ['PV2voltage', 'PV2current'], capability: 'measure_power.pv2' },
+            pollRate: PollRate.PRIO2,
+        },
+        PV3_POWER: {
+            reg: { operation: CompoundOperation.MULTIPLY, registers: ['PV3voltage', 'PV3current'], capability: 'measure_power.pv3' },
+            pollRate: PollRate.PRIO2,
+        },
+        PV4_POWER: {
+            reg: { operation: CompoundOperation.MULTIPLY, registers: ['PV4voltage', 'PV4current'], capability: 'measure_power.pv4' },
+            pollRate: PollRate.PRIO2,
+        },
+        PASSIVE_MODE: {
+            reg: { type: MRType.HOLDING, addr: 43311, len: 1, dtype: 'UINT16', scale: 0, capability: 'passive_mode', operation: Operation.TOSTRING },
+            pollRate: PollRate.PRIO4,
+        },
+        TOU_SWITCH: {
+            reg: { type: MRType.HOLDING, addr: 43707, len: 1, dtype: 'UINT16', scale: 0, capability: 'tou_slots', operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO1,
+        },
+        HOUSE_LOAD_POWER: {
+            reg: { type: MRType.INPUT, addr: 33147, len: 1, dtype: 'UINT16', scale: 0, capability: 'measure_power.house_load', operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO1,
+        },
+        LAST_SUCCESS: {
+            reg: {
+                capability: 'last_successful_read',
+                getValue: (client) => this.getSetting('last_successful_read'),
+                setValue: (client, value) => this.setSetting('last_successful_read', value),
+                settable: true,
+            },
+            pollRate: PollRate.PRIO2,
+        },
     };
 
     meterRegisters: Record<string, MonitoredRegister<BaseRegister>> = {
-        METER_POWER: { reg: { type: MRType.INPUT, addr: 33263, len: 2, dtype: 'INT32', scale: 0, capability: 'measure_power.grid', operation: Operation.INVERT }, pollRate: PollRate.PRIO1 },
-        GRID_IMPORTED_ENERGY: { reg: { type: MRType.INPUT, addr: 33169, len: 2, dtype: 'UINT32', scale: 0, capability: 'meter_power.grid_import', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
-        GRID_EXPORTED_ENERGY: { reg: { type: MRType.INPUT, addr: 33173, len: 2, dtype: 'UINT32', scale: 0, capability: 'meter_power.grid_export', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
-        GRID_IMPORTED_ENERGY_DAILY: { reg: { type: MRType.INPUT, addr: 33171, len: 2, dtype: 'UINT16', scale: -1, capability: 'meter_power.grid_import_daily', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
-        GRID_EXPORTED_ENERGY_DAILY: { reg: { type: MRType.INPUT, addr: 33175, len: 2, dtype: 'UINT16', scale: -1, capability: 'meter_power.grid_export_daily', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
-        ACCUMULATED_YIELD_ENERGY: { reg: { type: MRType.INPUT, addr: 33029, len: 2, dtype: 'UINT32', scale: 0, capability: 'meter_power', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
-        DAILY_YIELD_ENERGY: { reg: { type: MRType.INPUT, addr: 33035, len: 1, dtype: 'UINT16', scale: -1, capability: 'meter_power.daily', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
+        METER_POWER: {
+            reg: { type: MRType.INPUT, addr: 33263, len: 2, dtype: 'INT32', scale: 0, capability: 'measure_power.grid', operation: Operation.INVERT },
+            pollRate: PollRate.PRIO1,
+        },
+        GRID_IMPORTED_ENERGY: {
+            reg: { type: MRType.INPUT, addr: 33169, len: 2, dtype: 'UINT32', scale: 0, capability: 'meter_power.grid_import', operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO3,
+        },
+        GRID_EXPORTED_ENERGY: {
+            reg: { type: MRType.INPUT, addr: 33173, len: 2, dtype: 'UINT32', scale: 0, capability: 'meter_power.grid_export', operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO3,
+        },
+        GRID_IMPORTED_ENERGY_DAILY: {
+            reg: { type: MRType.INPUT, addr: 33171, len: 2, dtype: 'UINT16', scale: -1, capability: 'meter_power.grid_import_daily', operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO3,
+        },
+        GRID_EXPORTED_ENERGY_DAILY: {
+            reg: { type: MRType.INPUT, addr: 33175, len: 2, dtype: 'UINT16', scale: -1, capability: 'meter_power.grid_export_daily', operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO3,
+        },
+        ACCUMULATED_YIELD_ENERGY: {
+            reg: { type: MRType.INPUT, addr: 33029, len: 2, dtype: 'UINT32', scale: 0, capability: 'meter_power', operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO3,
+        },
+        DAILY_YIELD_ENERGY: {
+            reg: { type: MRType.INPUT, addr: 33035, len: 1, dtype: 'UINT16', scale: -1, capability: 'meter_power.daily', operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO3,
+        },
     };
 
     batteryRegisters: Record<string, MonitoredRegister<BaseRegister>> = {
         BATTERY_DIRECTION: { reg: { type: MRType.INPUT, addr: 33135, len: 2, dtype: 'UINT16', scale: 0, operation: Operation.DIRECT }, pollRate: PollRate.PRIO1 },
         BATTERY_POWER_RAW: { reg: { type: MRType.INPUT, addr: 33149, len: 2, dtype: 'INT32', scale: 0, operation: Operation.DIRECT }, pollRate: PollRate.PRIO1 },
-        BATTERY_POWER: { reg: { operation: CompoundOperation.POWER_DIRECTION, registers: ['BATTERY_POWER_RAW', 'BATTERY_DIRECTION'], capability: 'measure_power.batt_power' }, pollRate: PollRate.PRIO1 },
-        BATTERY: { reg: { type: MRType.INPUT, addr: 33139, len: 1, dtype: 'UINT16', scale: 0, capability: 'battery', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
-        MEASURE_BATTERY: { reg: { type: MRType.INPUT, addr: 33139, len: 1, dtype: 'UINT16', scale: 0, capability: 'measure_battery', operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
-        STORAGE_CURRENT_DAY_CHARGE_CAPACITY: { reg: { type: MRType.INPUT, addr: 33163, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT }, pollRate: PollRate.PRIO4 },
-        STORAGE_CURRENT_DAY_DISCHARGE_CAPACITY: { reg: { type: MRType.INPUT, addr: 33167, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT }, pollRate: PollRate.PRIO4 },
-        STORAGE_TOTAL_CHARGE: { reg: { type: MRType.INPUT, addr: 33161, len: 2, dtype: 'UINT32', scale: 0, operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
-        STORAGE_TOTAL_DISCHARGE: { reg: { type: MRType.INPUT, addr: 33165, len: 2, dtype: 'UINT32', scale: 0, operation: Operation.DIRECT }, pollRate: PollRate.PRIO3 },
-        STORAGE_MAXIMUM_CHARGE_POWER: { reg: { type: MRType.HOLDING, addr: 43012, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.chargesetting', operation: Operation.DIRECT, settable: true }, pollRate: PollRate.PRIO3 },
-        STORAGE_MAXIMUM_DISCHARGE_POWER: { reg: { type: MRType.HOLDING, addr: 43013, len: 1, dtype: 'UINT16', scale: -1, capability: 'measure_current.dischargesetting', operation: Operation.DIRECT, settable: true }, pollRate: PollRate.PRIO3 },
-        STORAGE_RATED_CAPACITY: { reg: { type: MRType.HOLDING, addr: 43019, len: 1, dtype: 'UINT16', scale: 0, operation: Operation.DIRECT }, pollRate: PollRate.PRIO4 },
-        STORAGE_CONTROL_MODE: { reg: { type: MRType.HOLDING, addr: 43110, len: 1, dtype: 'UINT16', scale: 0, capability: 'storage_control_mode', operation: Operation.STORAGE_CONTROL, settable: true }, pollRate: PollRate.PRIO1 },
-        OPERATING_MODE: { reg: { type: MRType.INPUT, addr: 33122, len: 1, dtype: 'UINT16', scale: 0, capability: 'operating_mode', operation: Operation.OPERATING_MODE }, pollRate: PollRate.PRIO1 },
-        FORCE_CHARGE_SOURCE: { reg: { type: MRType.HOLDING, addr: 43028, len: 1, dtype: 'UINT16', scale: 0, capability: 'force_charge_source', operation: Operation.DIRECT, settable: true }, pollRate: PollRate.PRIO1 },
-        FORCE_CHARGE_LIMIT: { reg: { type: MRType.HOLDING, addr: 43027, len: 1, dtype: 'UINT16', scale: 1, capability: 'measure_power.force_charge_limit', operation: Operation.DIRECT, settable: true }, pollRate: PollRate.PRIO1 },
-        FORCE_CHARGE_POWER: { reg: { type: MRType.HOLDING, addr: 43136, len: 1, dtype: 'UINT16', scale: 1, capability: 'measure_power.force_charge_power', operation: Operation.DIRECT, settable: true }, pollRate: PollRate.PRIO1 },
-        FORCE_DISCHARGE_POWER: { reg: { type: MRType.HOLDING, addr: 43129, len: 1, dtype: 'UINT16', scale: 1, capability: 'measure_power.force_discharge_power', operation: Operation.DIRECT, settable: true }, pollRate: PollRate.PRIO1 },
-        FORCE_CHARGE_DIRECTION: { reg: { type: MRType.HOLDING, addr: 43135, len: 1, dtype: 'UINT16', scale: 0, capability: 'force_charge_direction', operation: Operation.DIRECT, settable: true }, pollRate: PollRate.PRIO1 },
-        FORCE_BATTERY_CHARGE_MODE: { reg: { capability: 'force_battery_charge_mode', handler: (client, value) => this.handleForceBatteryChargeMode(client, value), settable: true }, pollRate: PollRate.PRIO2 },
-        PEAK_SOC: { reg: { type: MRType.HOLDING, addr: 43487, len: 1, dtype: 'UINT16', scale: 0, capability: 'peak_soc', operation: Operation.DIRECT, settable: true }, pollRate: PollRate.PRIO1 },
-        PEAK_SHAVING_MAX_GRID_POWER: { reg: { type: MRType.HOLDING, addr: 43488, len: 1, dtype: 'UINT16', scale: 2, capability: 'peak_shaving_max_grid_power', operation: Operation.DIRECT, settable: true }, pollRate: PollRate.PRIO3 },
+        BATTERY_POWER: {
+            reg: { operation: CompoundOperation.POWER_DIRECTION, registers: ['BATTERY_POWER_RAW', 'BATTERY_DIRECTION'], capability: 'measure_power.batt_power' },
+            pollRate: PollRate.PRIO1,
+        },
+        BATTERY: {
+            reg: { type: MRType.INPUT, addr: 33139, len: 1, dtype: 'UINT16', scale: 0, capability: 'battery', operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO3,
+        },
+        MEASURE_BATTERY: {
+            reg: { type: MRType.INPUT, addr: 33139, len: 1, dtype: 'UINT16', scale: 0, capability: 'measure_battery', operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO3,
+        },
+        STORAGE_CURRENT_DAY_CHARGE_CAPACITY: {
+            reg: { type: MRType.INPUT, addr: 33163, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO4,
+        },
+        STORAGE_CURRENT_DAY_DISCHARGE_CAPACITY: {
+            reg: { type: MRType.INPUT, addr: 33167, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO4,
+        },
+        STORAGE_TOTAL_CHARGE: {
+            reg: { type: MRType.INPUT, addr: 33161, len: 2, dtype: 'UINT32', scale: 0, operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO3,
+        },
+        STORAGE_TOTAL_DISCHARGE: {
+            reg: { type: MRType.INPUT, addr: 33165, len: 2, dtype: 'UINT32', scale: 0, operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO3,
+        },
+        STORAGE_MAXIMUM_CHARGE_POWER: {
+            reg: {
+                type: MRType.HOLDING,
+                addr: 43012,
+                len: 1,
+                dtype: 'UINT16',
+                scale: -1,
+                capability: 'measure_current.chargesetting',
+                operation: Operation.DIRECT,
+                settable: true,
+            },
+            pollRate: PollRate.PRIO3,
+        },
+        STORAGE_MAXIMUM_DISCHARGE_POWER: {
+            reg: {
+                type: MRType.HOLDING,
+                addr: 43013,
+                len: 1,
+                dtype: 'UINT16',
+                scale: -1,
+                capability: 'measure_current.dischargesetting',
+                operation: Operation.DIRECT,
+                settable: true,
+            },
+            pollRate: PollRate.PRIO3,
+        },
+        STORAGE_RATED_CAPACITY: {
+            reg: { type: MRType.HOLDING, addr: 43019, len: 1, dtype: 'UINT16', scale: 0, operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO4,
+        },
+        STORAGE_CONTROL_MODE: {
+            reg: {
+                type: MRType.HOLDING,
+                addr: 43110,
+                len: 1,
+                dtype: 'UINT16',
+                scale: 0,
+                capability: 'storage_control_mode',
+                operation: Operation.STORAGE_CONTROL,
+                settable: true,
+            },
+            pollRate: PollRate.PRIO1,
+        },
+        OPERATING_MODE: {
+            reg: { type: MRType.INPUT, addr: 33122, len: 1, dtype: 'UINT16', scale: 0, capability: 'operating_mode', operation: Operation.OPERATING_MODE },
+            pollRate: PollRate.PRIO1,
+        },
+        FORCE_CHARGE_SOURCE: {
+            reg: {
+                type: MRType.HOLDING,
+                addr: 43028,
+                len: 1,
+                dtype: 'UINT16',
+                scale: 0,
+                capability: 'force_charge_source',
+                operation: Operation.DIRECT,
+                settable: true,
+            },
+            pollRate: PollRate.PRIO1,
+        },
+        FORCE_CHARGE_LIMIT: {
+            reg: {
+                type: MRType.HOLDING,
+                addr: 43027,
+                len: 1,
+                dtype: 'UINT16',
+                scale: 1,
+                capability: 'measure_power.force_charge_limit',
+                operation: Operation.DIRECT,
+                settable: true,
+            },
+            pollRate: PollRate.PRIO1,
+        },
+        FORCE_CHARGE_POWER: {
+            reg: { type: MRType.HOLDING, addr: 43136, len: 1, dtype: 'UINT16', scale: 1, operation: Operation.DIRECT, settable: true },
+            pollRate: PollRate.PRIO1,
+        },
+        FORCE_DISCHARGE_POWER: {
+            reg: { type: MRType.HOLDING, addr: 43129, len: 1, dtype: 'UINT16', scale: 1, operation: Operation.DIRECT, settable: true },
+            pollRate: PollRate.PRIO1,
+        },
+        FORCE_CHARGE_DIRECTION: {
+            reg: {
+                type: MRType.HOLDING,
+                addr: 43135,
+                len: 1,
+                dtype: 'UINT16',
+                scale: 0,
+                capability: 'force_charge_direction',
+                operation: Operation.DIRECT,
+                settable: true,
+            },
+            pollRate: PollRate.PRIO1,
+        },
+        FORCE_BATTERY_CHARGE_MODE: {
+            reg: {
+                capability: 'force_battery_charge_mode',
+                getValue: (client) => this.chargeMode,
+                setValue: (client, value) => this.handleForceBatteryChargeMode(client, value),
+                settable: true,
+            },
+            pollRate: PollRate.PRIO2,
+        },
+        FORCE_BATTERY_CHARGE_MODE_NUM: {
+            reg: {
+                capability: 'force_battery_charge_mode_num',
+                getValue: (client) => this.chargeMode,
+                settable: false,
+            },
+            pollRate: PollRate.PRIO1,
+        },
+        FORCE_BATTERY_CHARGE_POWER: {
+            reg: {
+                capability: 'force_battery_charge_power',
+                getValue: (client) => this.getSetting('force_battery_charge_power'),
+                setValue: (client, value) => this.setSetting('force_battery_charge_power', value),
+                settable: true,
+            },
+            pollRate: PollRate.PRIO2,
+        },
+        FORCE_BATTERY_DISCHARGE_POWER: {
+            reg: {
+                capability: 'force_battery_discharge_power',
+                getValue: (client) => this.getSetting('force_battery_discharge_power'),
+                setValue: (client, value) => this.setSetting('force_battery_discharge_power', value),
+                settable: true,
+            },
+            pollRate: PollRate.PRIO2,
+        },
+        PEAK_SOC: {
+            reg: { type: MRType.HOLDING, addr: 43487, len: 1, dtype: 'UINT16', scale: -2, capability: 'peak_soc', operation: Operation.DIRECT, settable: true },
+            pollRate: PollRate.PRIO1,
+        },
+        PEAK_SHAVING_MAX_GRID_POWER: {
+            reg: {
+                type: MRType.HOLDING,
+                addr: 43488,
+                len: 1,
+                dtype: 'UINT16',
+                scale: 2,
+                capability: 'peak_shaving_max_grid_power',
+                operation: Operation.DIRECT,
+                settable: true,
+            },
+            pollRate: PollRate.PRIO3,
+        },
+        PEAK_SHAVING_MAX_GRID_POWER_SENSOR: {
+            reg: {
+                type: MRType.HOLDING,
+                addr: 43488,
+                len: 1,
+                dtype: 'UINT16',
+                scale: 2,
+                capability: 'peak_shaving_max_grid_power_sensor',
+                operation: Operation.DIRECT,
+            },
+            pollRate: PollRate.PRIO3,
+        },
     };
 
+    get chargeMode(): ForceBatteryChargeMode {
+        return this.getSetting('force_battery_charge_mode') as ForceBatteryChargeMode;
+    }
+
+    set chargeMode(mode: ForceBatteryChargeMode) {
+        console.log('= Storing charge mode', mode);
+        this.setSettings({ force_battery_charge_mode: mode });
+    }
+
+    get chargePower(): number {
+        return this.getSetting('force_battery_charge_power');
+    }
+
+    get dischargePower(): number {
+        return this.getSetting('force_battery_discharge_power');
+    }
+
+    get lastSuccessfulRead(): Date {
+        console.log('= Retrieving last successful read', this.getSetting('last_successful_read'));
+        return this.getSetting('last_successful_read') as Date;
+    }
+
+    set lastSuccessfulRead(date: Date) {
+        this.setSettings({ last_successful_read: date });
+    }
+
+    private setSetting(setting: string, value: string | number) {
+        console.log('= Storing', setting, value);
+        this.setSettings({ [setting]: value });
+    }
+
     static applyOperation(measurement: Measurement, operation: Operation): number | string {
+        if (isNil(measurement.value)) {
+            console.log('= Measurement value is nil, cannot apply operation');
+            return NaN;
+        }
+
         const numValue = Number(measurement.value);
         const scaledValue = numValue * Math.pow(10, measurement.scale);
 
@@ -402,36 +695,30 @@ export class Solis extends Homey.Device {
             default:
                 return scaledValue;
         }
-
     }
 
     async updateForceChargeCapability(result: Record<string, Measurement>): Promise<ForceBatteryChargeMode> {
         const chargeSource: ForceBatteryChargeSource = result.FORCE_CHARGE_SOURCE?.computedValue as number;
         const chargeLimit = result.FORCE_CHARGE_LIMIT?.computedValue as number;
+
         const chargePower = result.FORCE_CHARGE_POWER?.computedValue as number;
         const dischargePower = result.FORCE_DISCHARGE_POWER?.computedValue as number;
+
         const chargeDirection: ForceBatteryChargeDirection = result.FORCE_CHARGE_DIRECTION?.computedValue as number;
         const storageControlMode: StorageControlMode = result.STORAGE_CONTROL_MODE?.computedValue as number;
 
         const hasChargeLimit = chargeLimit !== 0;
-        const isCharging = chargeSource === ForceBatteryChargeSource.GRID_AND_PV && chargeDirection === ForceBatteryChargeDirection.CHARGE && chargePower !== 0 && dischargePower === 0 && hasChargeLimit;
-        const isDischarging = chargeSource === ForceBatteryChargeSource.GRID_AND_PV && chargeDirection === ForceBatteryChargeDirection.DISCHARGE && dischargePower !== 0 && chargePower === 0 && hasChargeLimit;
-        const isIdle = chargeSource === ForceBatteryChargeSource.GRID_AND_PV && chargeDirection === ForceBatteryChargeDirection.DISCHARGE && dischargePower === 0 && chargePower === 0 && hasChargeLimit;
-
+        const isCharging = chargeSource === ForceBatteryChargeSource.GRID_AND_PV && chargeDirection === ForceBatteryChargeDirection.CHARGE && hasChargeLimit;
+        const isDischarging = chargeSource === ForceBatteryChargeSource.GRID_AND_PV &&
+            chargeDirection === ForceBatteryChargeDirection.DISCHARGE &&
+            hasChargeLimit &&
+            dischargePower > 0;
+        const isIdle = chargeSource === ForceBatteryChargeSource.GRID_AND_PV &&
+            chargeDirection === ForceBatteryChargeDirection.DISCHARGE &&
+            hasChargeLimit &&
+            dischargePower === 0 &&
+            chargePower === 0;
         let mode = ForceBatteryChargeMode.UNKNOWN;
-
-        /*
-        this.log(`==== CHARGE STATUS: ${hasChargeLimit} / ${chargeSource} / ${chargeDirection} / ${dischargePower}`);
-        this.log(`=== SELF_USE: Storage mode is ${storageControlMode}, should be ${ForceStorageModes[ForceBatteryChargeMode.SELF_USE]}`);
-        this.log(`=== PEAK_SHAVING: Storage mode is ${storageControlMode}, should be ${ForceStorageModes[ForceBatteryChargeMode.PEAK_SHAVING]}`);
-        this.log(`=== CHARGE: Storage mode is ${storageControlMode}, should be ${ForceStorageModes[ForceBatteryChargeMode.CHARGE]}`);
-        this.log(`=== DISCHARGE: Storage mode is ${storageControlMode}, should be ${ForceStorageModes[ForceBatteryChargeMode.DISCHARGE]}`);
-        this.log(`=== IDLE: Storage mode is ${storageControlMode}, should be ${ForceStorageModes[ForceBatteryChargeMode.IDLE]}`);
-
-        this.log('=== Is Charging:', isCharging);
-        this.log('=== Is Discharging:', isDischarging);
-        this.log('=== Is Idle:', isIdle);
-        */
 
         if (isCharging && storageControlMode === ForceStorageModes[ForceBatteryChargeMode.CHARGE]) {
             mode = ForceBatteryChargeMode.CHARGE;
@@ -457,7 +744,9 @@ export class Solis extends Homey.Device {
         const measurement = await read(register, client);
         if (register.capability) {
             try {
-                await this.addCapability(register.capability);
+                if (!this.hasCapability(register.capability)) {
+                    await this.addCapability(register.capability);
+                }
             } catch (e) {
                 const { message } = e as Error;
                 if (/Invalid Capability/.test(message)) {
@@ -489,15 +778,33 @@ export class Solis extends Homey.Device {
             .map((register) => register.reg)
             .forEach(async (register) => {
                 try {
+                    if (!register.capability) {
+                        return;
+                    }
+                    //                    this.log(`= Setting up register: ${register.capability}`);
+
                     const isModbusRegister = (register as ModbusRegister).addr !== undefined;
-                    const isCustomRegister = (register as CustomRegister).handler !== undefined;
+                    const isCustomRegister = (register as CustomRegister).getValue !== undefined;
                     const isSettable = (register as CustomRegister).settable || (register as ModbusRegister).settable || false;
 
                     const modbusRegister = register as ModbusRegister;
                     const customRegister = register as CustomRegister;
 
+                    if (isCustomRegister) {
+                        try {
+                            await this.addCapability(customRegister.capability);
+                            const capabilityValue = await customRegister.getValue(client);
+                            if (!isNil(capabilityValue)) {
+                                this.log(`= Custom register capability ${customRegister.capability} initial value:`, capabilityValue, typeof capabilityValue);
+                                await this.setCapabilityValue(customRegister.capability, capabilityValue);
+                            }
+                        } catch (e) {
+                            console.error(`= Error setting up initial value for capability ${customRegister.capability}`, e);
+                        }
+                    }
+
                     if (isSettable) {
-                        this.log(`= Capability listener: ${register.capability}`);
+                        this.log(`= Setting up capability listener: ${register.capability}`);
 
                         this.registerCapabilityListener(register.capability!, async (value) => {
                             this.log(`= Setting ${register.capability} to: `, value);
@@ -505,7 +812,7 @@ export class Solis extends Homey.Device {
                             if (isModbusRegister) {
                                 await write(modbusRegister, client, value);
                             } else if (isCustomRegister) {
-                                await customRegister.handler(client, value);
+                                await customRegister.setValue!(client, value);
                             }
 
                             return value;
@@ -517,7 +824,6 @@ export class Solis extends Homey.Device {
                         this.log('=== Registering condition card for:', register.capability);
                         conditionCard.registerRunListener(async (args, state) => {
                             let currentValue = await this.getCapabilityValue(register.capability!);
-                            let checkResult = null;
 
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             const argument = conditionCard.getArgument('argument_main') as any;
@@ -528,16 +834,20 @@ export class Solis extends Homey.Device {
                                     if (typeof currentValue === 'string') {
                                         currentValue = Number.parseInt(currentValue, 10);
                                     }
-                                    checkResult = sumValues === currentValue;
-                                } if (argument.conjunction === 'or') {
-                                    checkResult = values.some((val) => val === currentValue);
+                                    const checkResult = sumValues === currentValue;
+                                    this.log(`= Checking condition for ${register.capability} - ${args.argument_main}: ${currentValue} => ${checkResult}`);
+                                    return checkResult;
                                 }
-                            } else {
-                                checkResult = args.argument_main === currentValue;
+                                if (argument.conjunction === 'or') {
+                                    const checkResult = values.some((val) => val === currentValue);
+                                    this.log(`= Checking condition for ${register.capability} - ${args.argument_main}: ${currentValue} => ${checkResult}`);
+                                    return checkResult;
+                                }
                             }
 
+                            const checkResult = args.argument_main === currentValue;
                             this.log(`= Checking condition for ${register.capability} - ${args.argument_main}: ${currentValue} => ${checkResult}`);
-                            return Promise.resolve(checkResult);
+                            return checkResult;
                         });
 
                         if (isSettable) {
@@ -547,14 +857,13 @@ export class Solis extends Homey.Device {
                                 if (isModbusRegister) {
                                     await write(modbusRegister, client, args.argument_main);
                                 } else if (isCustomRegister) {
-                                    await customRegister.handler(client, args.argument_main);
+                                    await customRegister.setValue!(client, args.argument_main);
                                 }
                             });
                         }
                     } catch (e) {
                         if (!/Invalid Flow Card ID/.test((e as Error).message)) {
                             this.error(`= Skipping flow cards for capability: ${register.capability} - ${(e as Error).message}`);
-                            return;
                         }
                     }
                 } catch (e) {
@@ -564,14 +873,14 @@ export class Solis extends Homey.Device {
     }
 
     private async rewriteChargeModeSetting(client: InstanceType<typeof Modbus.client.TCP>) {
-        if (this.chargeMode === undefined || this.chargeMode === ForceBatteryChargeMode.UNKNOWN) {
+        if (isNil(this.chargeMode) || this.chargeMode === ForceBatteryChargeMode.UNKNOWN) {
             this.log('= Charge mode is undefined or unknown, skipping rewrite');
             return;
         }
-        this.log(`=== Setting ${ForceBatteryChargeMode[this.chargeMode]} mode`);
+        this.log(`=== Setting ${ForceBatteryChargeMode[this.chargeMode]} mode`, this.chargeMode, typeof this.chargeMode);
 
         try {
-            await write(this.batteryRegisters.FORCE_CHARGE_LIMIT.reg as ModbusRegister, client, 5000);
+            await write(this.batteryRegisters.FORCE_CHARGE_LIMIT.reg as ModbusRegister, client, FORCE_CHARGE_POWER_LIMIT);
             await write(this.batteryRegisters.FORCE_CHARGE_SOURCE.reg as ModbusRegister, client, 1);
 
             const forceStorageMode = ForceStorageModes[this.chargeMode];
@@ -579,7 +888,7 @@ export class Solis extends Homey.Device {
             if (this.chargeMode === ForceBatteryChargeMode.CHARGE) {
                 await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.ON);
                 await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
-                await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, 10000);
+                await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, this.chargePower);
                 await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.CHARGE);
                 await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, 0);
             } else if (this.chargeMode === ForceBatteryChargeMode.DISCHARGE) {
@@ -587,7 +896,7 @@ export class Solis extends Homey.Device {
                 await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
                 await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, 0);
                 await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.DISCHARGE);
-                await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, 5000);
+                await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, this.dischargePower);
             } else if (this.chargeMode === ForceBatteryChargeMode.IDLE) {
                 await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.ON);
                 await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
@@ -599,7 +908,7 @@ export class Solis extends Homey.Device {
                 await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
                 await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, 0);
                 await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.DISCHARGE);
-                await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, 5000);
+                await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, this.dischargePower);
             } else {
                 await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.OFF);
                 await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
@@ -610,7 +919,11 @@ export class Solis extends Homey.Device {
             const storageControlMode = await this.readRegister('STORAGE_CONTROL_MODE', this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client);
             const operatingMode = await this.readRegister('OPERATING_MODE', this.batteryRegisters.OPERATING_MODE.reg as ModbusRegister, client);
             const forceChargePower = await this.readRegister('FORCE_CHARGE_POWER', this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client);
-            const forceChargeDirection = await this.readRegister('FORCE_CHARGE_DIRECTION', this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client);
+            const forceChargeDirection = await this.readRegister(
+                'FORCE_CHARGE_DIRECTION',
+                this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister,
+                client,
+            );
             const forceDischargePower = await this.readRegister('FORCE_DISCHARGE_POWER', this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client);
             const forceChargeSource = await this.readRegister('FORCE_CHARGE_SOURCE', this.batteryRegisters.FORCE_CHARGE_SOURCE.reg as ModbusRegister, client);
             const forceChargeLimit = await this.readRegister('FORCE_CHARGE_LIMIT', this.batteryRegisters.FORCE_CHARGE_LIMIT.reg as ModbusRegister, client);
@@ -626,7 +939,6 @@ export class Solis extends Homey.Device {
             };
 
             this.updateForceChargeCapability(result);
-
         } catch (error) {
             this.error('Error updating force battery charge mode:', error);
         }
@@ -678,7 +990,7 @@ export class Solis extends Homey.Device {
 
             const startTime = new Date();
 
-            this.log('= Polling modbus registers...');
+            this.log('= Polling modbus registers... Charge mode is ', this.chargeMode);
             for (const key of Object.keys(registers)) {
                 const register = registers[key] as MonitoredRegister<ModbusRegister>;
 
@@ -686,7 +998,7 @@ export class Solis extends Homey.Device {
                     continue;
                 }
 
-                const shouldPoll = (accumulatedTime % register.pollRate) === 0;
+                const shouldPoll = accumulatedTime % register.pollRate === 0;
                 if (!shouldPoll) {
                     continue;
                 }
@@ -708,8 +1020,12 @@ export class Solis extends Homey.Device {
                     continue;
                 }
 
-                const measurements = register.reg.registers
-                    .map((regKey) => results[regKey]);
+                const shouldPoll = accumulatedTime % register.pollRate === 0;
+                if (!shouldPoll) {
+                    continue;
+                }
+
+                const measurements = register.reg.registers.map((regKey) => results[regKey]);
 
                 if (!measurements.every((measurement) => measurement !== undefined)) {
                     this.log(`== Skipping compound register key: ${register.reg.capability}, missing one of: ${register.reg.registers.join(', ')}`);
@@ -723,12 +1039,11 @@ export class Solis extends Homey.Device {
 
                 await this.addCapability(register.reg.capability);
 
-                const values = register.reg.registers
-                    .map((regKey) => {
-                        const measurement = results[regKey];
+                const values = register.reg.registers.map((regKey) => {
+                    const measurement = results[regKey];
 
-                        return measurement.computedValue as number;
-                    });
+                    return measurement.computedValue as number;
+                });
 
                 let compoundValue = 0;
                 if (register.reg.operation === 'multiply') {
@@ -757,6 +1072,37 @@ export class Solis extends Homey.Device {
                 await this.setCapabilityValue(register.reg.capability, compoundValue);
             }
 
+            this.log('= Calculating custom registers...');
+            for (const key of Object.keys(registers)) {
+                const register = registers[key] as MonitoredRegister<CustomRegister>;
+
+                if (!register.reg.getValue) {
+                    continue;
+                }
+
+                const shouldPoll = accumulatedTime % register.pollRate === 0;
+                if (!shouldPoll) {
+                    continue;
+                }
+
+                try {
+                    const value = await register.reg.getValue(client);
+                    results[key] = {
+                        value,
+                        scale: 0,
+                        operation: Operation.DIRECT,
+                        capability: register.reg.capability,
+                        computedValue: value,
+                    } as Measurement;
+
+                    this.log(`= Read customer register ${key} (${register.reg.capability}) => ${value}`);
+                    await this.addCapability(register.reg.capability);
+                    await this.setCapabilityValue(register.reg.capability, value);
+                } catch (error) {
+                    this.log(`=== error reading custom register ${register.reg.capability} - '${(error as Error).message}'`);
+                }
+            }
+
             let detectedMode = ForceBatteryChargeMode.UNKNOWN;
             try {
                 detectedMode = await this.updateForceChargeCapability(results);
@@ -764,15 +1110,13 @@ export class Solis extends Homey.Device {
                 this.log('error updating force charge capability!', (error as Error).message);
             }
 
-            if ((accumulatedTime % 60) === 0) {
-                try {
-                    if (this.chargeMode !== ForceBatteryChargeMode.UNKNOWN && this.chargeMode !== detectedMode) {
-                        this.log(`=== Detected ${detectedMode}, rewriting force charge to ${this.chargeMode} ===`);
-                        await this.rewriteChargeModeSetting(client);
-                    }
-                } catch (error) {
-                    this.log('error rewriting charge mode setting!', (error as Error).message);
+            try {
+                if (!isNil(this.chargeMode) && this.chargeMode !== ForceBatteryChargeMode.UNKNOWN && this.chargeMode !== detectedMode) {
+                    this.log(`=== Detected ${detectedMode}, rewriting force charge to ${this.chargeMode} ===`);
+                    await this.rewriteChargeModeSetting(client);
                 }
+            } catch (error) {
+                this.log('error rewriting charge mode setting!', (error as Error).message);
             }
 
             const endTime = new Date();
@@ -783,5 +1127,15 @@ export class Solis extends Homey.Device {
             accumulatedTime += highestPollRate;
             await HelperService.delay(highestPollRate * 1000);
         }
+    }
+
+    setCapabilityValue(capabilityId: string, value: string | number): Promise<void> {
+        return super.setCapabilityValue(capabilityId, value).catch((e) => {
+            if (/Expected: string/.test((e as Error).message)) {
+                return super.setCapabilityValue(capabilityId, `${value}`);
+            }
+            console.log('ERROR!', e);
+            throw e;
+        });
     }
 }

@@ -47,6 +47,11 @@
           }
         }
       ]
+    },
+    {
+      "type": "device",
+      "name": "device",
+      "filter": "driver_id=soliswithbatt"
     }
   ]
 }

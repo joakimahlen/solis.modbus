@@ -1,0 +1,52 @@
+{
+  "title": {
+    "en": "Peak shaving max grid power is"
+  },
+  "titleFormatted": {
+    "en": "Peak shaving max grid power !{{is|isn't}} [[comparison]] [[value]] W"
+  },
+  "hint": {
+    "en": "Check if the peak shaving max grid power setting meets the condition"
+  },
+  "args": [
+    {
+      "name": "comparison",
+      "type": "dropdown",
+      "values": [
+        {
+          "id": "equal",
+          "title": {
+            "en": "Equal to"
+          }
+        },
+        {
+          "id": "greater",
+          "title": {
+            "en": "Greater than"
+          }
+        },
+        {
+          "id": "less",
+          "title": {
+            "en": "Less than"
+          }
+        }
+      ]
+    },
+    {
+      "name": "value",
+      "type": "number",
+      "min": 0,
+      "max": 100000,
+      "step": 1,
+      "placeholder": {
+        "en": "Watts"
+      }
+    },
+    {
+      "type": "device",
+      "name": "device",
+      "filter": "driver_id=soliswithbatt"
+    }
+  ]
+}

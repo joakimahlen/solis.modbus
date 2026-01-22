@@ -1,9 +1,9 @@
 {
   "title": {
-    "en": "Storage control mode is"
+    "en": "Storage control mode !{{is|isn't}}"
   },
   "titleFormatted": {
-    "en": "Storage control mode is [[argument_main]]"
+    "en": "Storage control mode !{{is|isn't}} [[argument_main]]"
   },
   "hint": {
     "en": "The current Storage control mode"
@@ -87,6 +87,11 @@
           }
         }
       ]
+    },
+    {
+      "type": "device",
+      "name": "device",
+      "filter": "driver_id=solis|soliswithbatt"
     }
   ]
 }

@@ -34,17 +34,21 @@
     "solis_model",
     "solis_status",
     "force_battery_charge_mode",
+    "force_battery_charge_mode_num",
     "storage_control_mode",
     "operating_mode",
     "force_charge_source",
     "measure_power.force_charge_limit",
-    "measure_power.force_charge_power",
-    "measure_power.force_discharge_power",
+    "force_battery_charge_power",
+    "force_battery_discharge_power",
+    "force_charge_power",
+    "force_discharge_power",
     "force_charge_direction",
     "measure_power.grid",
     "passive_mode",
     "peak_shaving_max_grid_power",
-    "peak_soc"
+    "peak_soc",
+    "last_successful_read"
   ],
   "capabilitiesOptions": {
     "measure_power": {
@@ -140,19 +144,19 @@
         "en": "Force charge battery"
       }
     },
+    "force_battery_charge_mode_num": {
+      "title": {
+        "en": "Force charge battery"
+      }
+    },
+    "last_successful_read": {
+      "title": {
+        "en": "Last successful read"
+      }
+    },
     "measure_power.force_charge_limit": {
       "title": {
         "en": "Force charge limit"
-      }
-    },
-    "measure_power.force_charge_power": {
-      "title": {
-        "en": "Force charge power"
-      }
-    },
-    "measure_power.force_discharge_power": {
-      "title": {
-        "en": "Force discharge power"
       }
     },
     "peak_shaving_max_grid_power": {
@@ -162,7 +166,7 @@
     },
     "peak_soc": {
       "title": {
-        "en": "Peak shaving SOC in percentage (%)"
+        "en": "Peak shave when SOC less than (%)"
       }
     },
     "measure_power.grid": {

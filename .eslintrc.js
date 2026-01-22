@@ -5,7 +5,7 @@ module.exports = {
     node: true,
     es2020: true,
   },
-  extends: ['athom/homey-app'],
+  extends: ['athom/homey-app', 'plugin:prettier/recommended'],
   parserOptions: {
     ecmaVersion: 2020,
     sourceType: 'module',

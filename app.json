@@ -1,7 +1,7 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "solis.modbus",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "compatibility": ">=12.5.0",
   "sdk": 3,
   "brandColor": "#f68f18",
@@ -240,15 +240,41 @@
           }
         ],
         "id": "meter_power_day_changed"
+      },
+      {
+        "title": {
+          "en": "Peak shaving max grid power changed"
+        },
+        "titleFormatted": {
+          "en": "Peak shaving max grid power changed"
+        },
+        "tokens": [
+          {
+            "name": "peak_shaving_max_grid_power",
+            "type": "number",
+            "title": {
+              "en": "Peak shaving max grid power"
+            },
+            "example": 5000
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=soliswithbatt"
+          }
+        ],
+        "id": "peak_shaving_max_grid_power"
       }
     ],
     "conditions": [
       {
         "title": {
-          "en": "Force battery charge mode is"
+          "en": "Force battery charge mode !{{is|isn't}}"
         },
         "titleFormatted": {
-          "en": "Force battery charge is [[argument_main]]"
+          "en": "Force battery charge !{{is|isn't}} [[argument_main]]"
         },
         "hint": {
           "en": "The current Force battery charge mode"
@@ -295,16 +321,103 @@
                 }
               }
             ]
+          },
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=soliswithbatt"
           }
         ],
         "id": "force_battery_charge_mode"
       },
       {
         "title": {
-          "en": "Storage control mode is"
+          "en": "Last successful read was within"
         },
         "titleFormatted": {
-          "en": "Storage control mode is [[argument_main]]"
+          "en": "Last successful read !{{was|wasn't}} within [[minutes]] minutes"
+        },
+        "hint": {
+          "en": "Check if the inverter was successfully read within the specified number of minutes"
+        },
+        "args": [
+          {
+            "name": "minutes",
+            "type": "number",
+            "min": 1,
+            "max": 1440,
+            "step": 1,
+            "placeholder": {
+              "en": "Minutes"
+            }
+          },
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=solis|soliswithbatt"
+          }
+        ],
+        "id": "last_successful_read"
+      },
+      {
+        "title": {
+          "en": "Peak shaving max grid power is"
+        },
+        "titleFormatted": {
+          "en": "Peak shaving max grid power !{{is|isn't}} [[comparison]] [[value]] W"
+        },
+        "hint": {
+          "en": "Check if the peak shaving max grid power setting meets the condition"
+        },
+        "args": [
+          {
+            "name": "comparison",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "equal",
+                "title": {
+                  "en": "Equal to"
+                }
+              },
+              {
+                "id": "greater",
+                "title": {
+                  "en": "Greater than"
+                }
+              },
+              {
+                "id": "less",
+                "title": {
+                  "en": "Less than"
+                }
+              }
+            ]
+          },
+          {
+            "name": "value",
+            "type": "number",
+            "min": 0,
+            "max": 100000,
+            "step": 1,
+            "placeholder": {
+              "en": "Watts"
+            }
+          },
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=soliswithbatt"
+          }
+        ],
+        "id": "peak_shaving_max_grid_power"
+      },
+      {
+        "title": {
+          "en": "Storage control mode !{{is|isn't}}"
+        },
+        "titleFormatted": {
+          "en": "Storage control mode !{{is|isn't}} [[argument_main]]"
         },
         "hint": {
           "en": "The current Storage control mode"
@@ -388,6 +501,11 @@
                 }
               }
             ]
+          },
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=solis|soliswithbatt"
           }
         ],
         "id": "storage_control_mode"
@@ -443,12 +561,75 @@
                 }
               }
             ]
+          },
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=soliswithbatt"
           }
         ],
         "id": "force_battery_charge_mode_main"
       },
       {
-        "id": "changedpeak_shaving_max_grid_power",
+        "id": "changedforce_battery_charge_power",
+        "title": {
+          "en": "Set force battery charge power"
+        },
+        "titleFormatted": {
+          "en": "Set force battery charge power to [[argument_main]]"
+        },
+        "args": [
+          {
+            "type": "number",
+            "name": "argument_main",
+            "title": {
+              "en": "Force battery charge power (W)"
+            },
+            "placeholder": {
+              "en": "1000"
+            },
+            "min": 0,
+            "max": 10000,
+            "step": 200
+          },
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=soliswithbatt"
+          }
+        ]
+      },
+      {
+        "id": "changedforce_battery_discharge_power",
+        "title": {
+          "en": "Set force battery discharge power"
+        },
+        "titleFormatted": {
+          "en": "Set force battery discharge power to [[argument_main]]"
+        },
+        "args": [
+          {
+            "type": "number",
+            "name": "argument_main",
+            "title": {
+              "en": "Force battery discharge power (W)"
+            },
+            "placeholder": {
+              "en": "1000"
+            },
+            "min": 0,
+            "max": 10000,
+            "step": 200
+          },
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=soliswithbatt"
+          }
+        ]
+      },
+      {
+        "id": "peak_shaving_max_grid_power_main",
         "title": {
           "en": "Set peak shaving max grid power"
         },
@@ -472,7 +653,7 @@
           {
             "type": "device",
             "name": "device",
-            "filter": "driver_id=solis|soliswithbatt"
+            "filter": "driver_id=soliswithbatt"
           }
         ]
       }
@@ -681,17 +862,21 @@
         "solis_model",
         "solis_status",
         "force_battery_charge_mode",
+        "force_battery_charge_mode_num",
         "storage_control_mode",
         "operating_mode",
         "force_charge_source",
         "measure_power.force_charge_limit",
-        "measure_power.force_charge_power",
-        "measure_power.force_discharge_power",
+        "force_battery_charge_power",
+        "force_battery_discharge_power",
+        "force_charge_power",
+        "force_discharge_power",
         "force_charge_direction",
         "measure_power.grid",
         "passive_mode",
         "peak_shaving_max_grid_power",
-        "peak_soc"
+        "peak_soc",
+        "last_successful_read"
       ],
       "capabilitiesOptions": {
         "measure_power": {
@@ -787,19 +972,19 @@
             "en": "Force charge battery"
           }
         },
+        "force_battery_charge_mode_num": {
+          "title": {
+            "en": "Force charge battery"
+          }
+        },
+        "last_successful_read": {
+          "title": {
+            "en": "Last successful read"
+          }
+        },
         "measure_power.force_charge_limit": {
           "title": {
             "en": "Force charge limit"
-          }
-        },
-        "measure_power.force_charge_power": {
-          "title": {
-            "en": "Force charge power"
-          }
-        },
-        "measure_power.force_discharge_power": {
-          "title": {
-            "en": "Force discharge power"
           }
         },
         "peak_shaving_max_grid_power": {
@@ -809,7 +994,7 @@
         },
         "peak_soc": {
           "title": {
-            "en": "Peak shaving SOC in percentage (%)"
+            "en": "Peak shave when SOC less than (%)"
           }
         },
         "measure_power.grid": {
@@ -1025,6 +1210,49 @@
         }
       ]
     },
+    "force_battery_charge_mode_num": {
+      "type": "number",
+      "title": {
+        "en": "Force battery charge mode is"
+      },
+      "getable": true,
+      "setable": false,
+      "insights": true,
+      "uiComponent": "sensor"
+    },
+    "force_battery_charge_power": {
+      "type": "number",
+      "title": {
+        "en": "Force charge power"
+      },
+      "uiComponent": "slider",
+      "getable": true,
+      "setable": true,
+      "units": {
+        "en": "W"
+      },
+      "min": 0,
+      "max": 10000,
+      "step": 200
+    },
+    "force_battery_discharge_power": {
+      "type": "number",
+      "title": {
+        "en": "Force discharge power"
+      },
+      "desc": {
+        "en": "Set the forced discharge power level"
+      },
+      "uiComponent": "slider",
+      "getable": true,
+      "setable": true,
+      "units": {
+        "en": "W"
+      },
+      "min": 0,
+      "max": 10000,
+      "step": 200
+    },
     "force_charge_direction": {
       "type": "number",
       "title": {
@@ -1033,6 +1261,17 @@
       "getable": true,
       "setable": false,
       "uiComponent": "sensor"
+    },
+    "force_charge_power": {
+      "type": "number",
+      "title": {
+        "en": "Force charge power"
+      },
+      "getable": true,
+      "setable": false,
+      "units": {
+        "en": "W"
+      }
     },
     "force_charge_source": {
       "type": "number",
@@ -1043,6 +1282,27 @@
       "getable": true,
       "setable": false,
       "uiComponent": "sensor"
+    },
+    "force_discharge_power": {
+      "type": "number",
+      "title": {
+        "en": "Force discharge power"
+      },
+      "getable": true,
+      "setable": false,
+      "units": {
+        "en": "W"
+      }
+    },
+    "last_successful_read": {
+      "type": "string",
+      "title": {
+        "en": "Last successful read"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/operational_status.svg"
     },
     "measure_current": {
       "type": "number",
@@ -1267,6 +1527,24 @@
       "max": 10000,
       "step": 200
     },
+    "peak_shaving_max_grid_power_sensor": {
+      "type": "number",
+      "title": {
+        "en": "Peak shaving max grid power"
+      },
+      "units": {
+        "en": "kW"
+      },
+      "insights": true,
+      "desc": {
+        "en": "Power in kilowatt (kW)"
+      },
+      "chartType": "stepLine",
+      "decimals": 2,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
     "peak_soc": {
       "type": "number",
       "title": {
@@ -1276,12 +1554,12 @@
         "en": "%"
       },
       "min": 0,
-      "max": 100,
+      "max": 1,
       "desc": {
-        "en": "Peak shaving SOC in percentage (%)"
+        "en": "Peak shave when SOC less than (%)"
       },
       "chartType": "spline",
-      "decimals": 0,
+      "decimals": 2,
       "getable": true,
       "setable": true,
       "uiComponent": "slider"

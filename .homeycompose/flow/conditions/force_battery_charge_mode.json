@@ -1,9 +1,9 @@
 {
   "title": {
-    "en": "Force battery charge mode is"
+    "en": "Force battery charge mode !{{is|isn't}}"
   },
   "titleFormatted": {
-    "en": "Force battery charge is [[argument_main]]"
+    "en": "Force battery charge !{{is|isn't}} [[argument_main]]"
   },
   "hint": {
     "en": "The current Force battery charge mode"
@@ -50,6 +50,11 @@
           }
         }
       ]
+    },
+    {
+      "type": "device",
+      "name": "device",
+      "filter": "driver_id=soliswithbatt"
     }
   ]
 }

@@ -1,0 +1,10 @@
+{
+  "type": "number",
+  "title": {
+    "en": "Force battery charge mode is"
+  },
+  "getable": true,
+  "setable": false,
+  "insights": true,
+  "uiComponent": "sensor"
+}

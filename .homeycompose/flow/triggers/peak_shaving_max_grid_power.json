@@ -1,0 +1,25 @@
+{
+  "title": {
+    "en": "Peak shaving max grid power changed"
+  },
+  "titleFormatted": {
+    "en": "Peak shaving max grid power changed"
+  },
+  "tokens": [
+    {
+      "name": "peak_shaving_max_grid_power",
+      "type": "number",
+      "title": {
+        "en": "Peak shaving max grid power"
+      },
+      "example": 5000
+    }
+  ],
+  "args": [
+    {
+      "type": "device",
+      "name": "device",
+      "filter": "driver_id=soliswithbatt"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "type": "number",
+  "title": {
+    "en": "Force charge power"
+  },
+  "getable": true,
+  "setable": false,
+  "units": {
+    "en": "W"
+  }
+}

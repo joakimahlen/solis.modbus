@@ -8,8 +8,14 @@ import { Measurement } from './measurement';
 
 export async function rawWrite(register: ModbusRegister, client: InstanceType<typeof Modbus.client.TCP>, value: number): Promise<void> {
   if (register.type === MRType.HOLDING) {
-    const scaledValue = value * Math.pow(10, -register.scale);
+    let scaledValue = value * Math.pow(10, -register.scale);
+
+    if (/INT/.test(register.dtype)) {
+      scaledValue = Math.round(scaledValue);
+    }
+
     console.log(`= writing reg ${register.addr} with value: ${value} - ${scaledValue}`);
+
     await client.writeSingleRegister(register.addr, scaledValue);
     console.log(`= write response reg ${register.addr}`);
   } else {

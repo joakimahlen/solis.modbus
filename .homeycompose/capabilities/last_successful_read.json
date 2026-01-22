@@ -1,0 +1,10 @@
+{
+  "type": "string",
+  "title": {
+    "en": "Last successful read"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "icon": "/assets/operational_status.svg"
+}

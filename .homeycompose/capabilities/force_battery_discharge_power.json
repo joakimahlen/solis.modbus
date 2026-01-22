@@ -1,0 +1,18 @@
+{
+  "type": "number",
+  "title": {
+    "en": "Force discharge power"
+  },
+  "desc": {
+    "en": "Set the forced discharge power level"
+  },
+  "uiComponent": "slider",
+  "getable": true,
+  "setable": true,
+  "units": {
+    "en": "W"
+  },
+  "min": 0,
+  "max": 10000,
+  "step": 200
+}
