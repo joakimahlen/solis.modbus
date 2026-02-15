@@ -28,8 +28,11 @@
   },
   "dependencies": {
     "homey-log": "^2.1.0",
+    "homey-log-to-file": "github:robertklep/homey-log-to-file",
+    "i": "^0.3.7",
     "jsmodbus": "^4.0.10",
     "lodash": "^4.17.21",
-    "moment-timezone": "^0.5.47"
+    "moment-timezone": "^0.5.47",
+    "npm": "^11.8.0"
   }
 }

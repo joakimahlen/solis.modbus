@@ -990,7 +990,7 @@ export class Solis extends Homey.Device {
 
             const startTime = new Date();
 
-            this.log('= Polling modbus registers... Charge mode is ', this.chargeMode);
+            this.log('= Polling modbus registers... Charge mode is ', ForceBatteryChargeMode[this.chargeMode]);
             for (const key of Object.keys(registers)) {
                 const register = registers[key] as MonitoredRegister<ModbusRegister>;
 
