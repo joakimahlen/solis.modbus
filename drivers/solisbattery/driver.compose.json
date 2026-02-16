@@ -1,0 +1,115 @@
+{
+  "name": {
+    "en": "Solis Battery"
+  },
+  "class": "battery",
+  "energy": {
+    "batteries": [
+      "OTHER"
+    ]
+  },
+  "capabilities": [
+    "battery",
+    "measure_battery",
+    "measure_power",
+    "measure_current.chargesetting",
+    "measure_current.dischargesetting",
+    "force_battery_charge_mode",
+    "force_battery_charge_mode_num",
+    "storage_control_mode",
+    "operating_mode",
+    "force_charge_source",
+    "measure_power.force_charge_limit",
+    "force_battery_charge_power",
+    "force_battery_discharge_power",
+    "force_charge_power",
+    "force_discharge_power",
+    "force_charge_direction",
+    "passive_mode",
+    "peak_shaving_max_grid_power",
+    "peak_soc"
+  ],
+  "capabilitiesOptions": {
+    "measure_power": {
+      "decimals": 0,
+      "title": {
+        "en": "Battery Power"
+      }
+    },
+    "measure_current.chargesetting": {
+      "title": {
+        "en": "Max Charge Current"
+      }
+    },
+    "measure_current.dischargesetting": {
+      "title": {
+        "en": "Max Discharge Current"
+      }
+    },
+    "storage_control_mode": {
+      "title": {
+        "en": "Storage control mode"
+      }
+    },
+    "operating_mode": {
+      "title": {
+        "en": "Operating mode"
+      }
+    },
+    "force_battery_charge_mode": {
+      "title": {
+        "en": "Force charge battery"
+      }
+    },
+    "force_battery_charge_mode_num": {
+      "title": {
+        "en": "Force charge battery"
+      }
+    },
+    "measure_power.force_charge_limit": {
+      "title": {
+        "en": "Force charge limit"
+      }
+    },
+    "peak_shaving_max_grid_power": {
+      "title": {
+        "en": "Peak shaving max grid power"
+      }
+    },
+    "peak_soc": {
+      "title": {
+        "en": "Peak shave when SOC less than (%)"
+      }
+    },
+    "force_charge_direction": {
+      "title": {
+        "en": "Force charge direction"
+      }
+    },
+    "force_charge_source": {
+      "title": {
+        "en": "Force charge source"
+      }
+    },
+    "passive_mode": {
+      "title": {
+        "en": "Passive mode"
+      }
+    }
+  },
+  "platforms": [
+    "local"
+  ],
+  "connectivity": [
+    "lan"
+  ],
+  "images": {
+    "small": "{{driverAssetsPath}}/images/small.png",
+    "large": "{{driverAssetsPath}}/images/large.png"
+  },
+  "pair": [
+    {
+      "id": "start"
+    }
+  ]
+}

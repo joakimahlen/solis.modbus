@@ -10,12 +10,23 @@
     "deviceidbattery": "Has battery",
     "deviceid2": "Device ID2",
     "deviceid2battery": "Has battery",
-    "connect": "Connect"
+    "connect": "Connect",
+    "add": "Add Device",
+    "intro_app_settings": "This device uses the connection settings configured in the app settings."
   },
   "Unreachable": "Unreachable",
   "Off": "Off",
   "BatteryStandby": "Battery Standby",
   "Charge": "Battery Charging",
   "Discharge": "Battery Discharging",
-  "NA": "Information Not Available"
+  "NA": "Information Not Available",
+  "settings": {
+    "title": "Modbus Connection",
+    "description": "Configure the Modbus TCP connection to your Solis inverter. These settings are shared by all Solis devices.",
+    "address": "IP Address",
+    "port": "Port",
+    "inverterid": "Inverter ID",
+    "save": "Save",
+    "saved": "Settings saved."
+  }
 }

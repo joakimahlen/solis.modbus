@@ -1,0 +1,184 @@
+{
+  "name": {
+    "en": "Solis Inverter"
+  },
+  "class": "solarpanel",
+  "capabilities": [
+    "measure_power",
+    "measure_power.active",
+    "measure_power.pv1",
+    "measure_power.pv2",
+    "measure_power.pv3",
+    "measure_power.pv4",
+    "measure_power.house_load",
+    "measure_power.grid",
+    "measure_power.grid_phase1",
+    "measure_power.grid_phase2",
+    "measure_power.grid_phase3",
+    "measure_temperature.inverter",
+    "meter_power",
+    "meter_power.daily",
+    "meter_power.grid_export",
+    "meter_power.grid_import",
+    "meter_power.grid_export_daily",
+    "meter_power.grid_import_daily",
+    "solis_model",
+    "solis_status",
+    "tou_slots",
+    "last_successful_read"
+  ],
+  "capabilitiesOptions": {
+    "measure_power": {
+      "decimals": 0,
+      "title": {
+        "en": "PV Power"
+      }
+    },
+    "measure_power.active": {
+      "decimals": 0,
+      "title": {
+        "en": "Active Power"
+      }
+    },
+    "measure_power.pv1": {
+      "title": {
+        "en": "PV1 Power"
+      }
+    },
+    "measure_power.pv2": {
+      "title": {
+        "en": "PV2 Power"
+      }
+    },
+    "measure_power.pv3": {
+      "title": {
+        "en": "PV3 Power"
+      }
+    },
+    "measure_power.pv4": {
+      "title": {
+        "en": "PV4 Power"
+      }
+    },
+    "measure_power.house_load": {
+      "decimals": 0,
+      "title": {
+        "en": "House Load Power"
+      }
+    },
+    "measure_power.grid": {
+      "title": {
+        "en": "Grid power"
+      }
+    },
+    "measure_power.grid_phase1": {
+      "decimals": 0,
+      "title": {
+        "en": "Grid Power Phase 1"
+      }
+    },
+    "measure_power.grid_phase2": {
+      "decimals": 0,
+      "title": {
+        "en": "Grid Power Phase 2"
+      }
+    },
+    "measure_power.grid_phase3": {
+      "decimals": 0,
+      "title": {
+        "en": "Grid Power Phase 3"
+      }
+    },
+    "measure_temperature.inverter": {
+      "title": {
+        "en": "Heatsink temperature"
+      },
+      "decimals": 2
+    },
+    "meter_power": {
+      "title": {
+        "en": "Total Yield"
+      },
+      "decimals": 2
+    },
+    "meter_power.daily": {
+      "title": {
+        "en": "Total Day Yield"
+      },
+      "decimals": 2,
+      "icon": "/assets/total_yield.svg"
+    },
+    "meter_power.grid_import": {
+      "title": {
+        "en": "Total Grid Import"
+      },
+      "units": {
+        "en": "kWh"
+      },
+      "decimals": 1,
+      "icon": "/assets/total_yield.svg"
+    },
+    "meter_power.grid_export": {
+      "title": {
+        "en": "Total Grid Export"
+      },
+      "units": {
+        "en": "kWh"
+      },
+      "decimals": 1,
+      "icon": "/assets/total_yield.svg"
+    },
+    "meter_power.grid_import_daily": {
+      "title": {
+        "en": "Grid Import Today"
+      },
+      "units": {
+        "en": "kWh"
+      },
+      "decimals": 1,
+      "icon": "/assets/total_yield.svg"
+    },
+    "meter_power.grid_export_daily": {
+      "title": {
+        "en": "Grid Export Today"
+      },
+      "units": {
+        "en": "kWh"
+      },
+      "decimals": 1,
+      "icon": "/assets/total_yield.svg"
+    },
+    "solis_status": {
+      "title": {
+        "en": "Inverter status"
+      },
+      "icon": "/assets/operational_status.svg"
+    },
+    "solis_model": {
+      "title": {
+        "en": "Inverter model"
+      },
+      "icon": "/assets/operational_status.svg"
+    },
+    "last_successful_read": {
+      "title": {
+        "en": "Last successful read"
+      }
+    }
+  },
+  "platforms": [
+    "local"
+  ],
+  "connectivity": [
+    "lan"
+  ],
+  "images": {
+    "small": "{{driverAssetsPath}}/images/small.png",
+    "large": "{{driverAssetsPath}}/images/large.png"
+  },
+  "pair": [
+    {
+      "id": "start"
+    }
+  ]
+}

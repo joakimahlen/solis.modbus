@@ -16,7 +16,7 @@
     {
       "type": "device",
       "name": "device",
-      "filter": "driver_id=sollis|soliswithbatt"
+      "filter": "driver_id=sollis|soliswithbatt|solisinverter"
     }
   ]
 }

@@ -1,0 +1,43 @@
+<script type="text/javascript">
+  Homey.setTitle(__('pair.title'));
+
+  $(function () {
+    $('#add').click(function () {
+      var deviceId = Math.random().toString(36).substr(2, 5).toLowerCase();
+
+      Homey.addDevice(
+        {
+          name: 'Solis Inverter',
+          data: { id: deviceId },
+        },
+        function (error, result) {
+          if (error) {
+            $('.solis-error').show();
+            $('.solis-error-msg').html(error.message || error.toString());
+            return;
+          }
+          Homey.done();
+        },
+      );
+    });
+  });
+</script>
+
+<style type="text/css">
+  .buttons {
+    padding-top: 14px;
+  }
+  .button:enabled {
+    background-color: #00c139 !important;
+    color: #fff;
+  }
+</style>
+
+<p data-i18n="pair.intro_app_settings">This device uses the connection settings configured in the app settings.</p>
+<div class="buttons">
+  <button id="add" class="button" data-i18n="pair.add">Add Device</button>
+</div>
+
+<div class="messages">
+  <p class="solis-error" style="color: #ff6300; display: none"><i class="fa fa-times"></i> <span class="solis-error-msg"></span></p>
+</div>
