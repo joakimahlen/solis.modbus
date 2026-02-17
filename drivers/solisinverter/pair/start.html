@@ -2,6 +2,17 @@
   Homey.setTitle(__('pair.title'));
 
   $(function () {
+    // Check if app settings are configured
+    Homey.getSettings(function (err, settings) {
+      if (!err && settings && settings.address) {
+        $('#status').html(__('pair.intro_app_settings'));
+        $('#add').prop('disabled', false);
+      } else {
+        $('#status').html(__('pair.no_settings'));
+        $('#add').prop('disabled', true);
+      }
+    });
+
     $('#add').click(function () {
       var deviceId = Math.random().toString(36).substr(2, 5).toLowerCase();
 
@@ -33,9 +44,9 @@
   }
 </style>
 
-<p data-i18n="pair.intro_app_settings">This device uses the connection settings configured in the app settings.</p>
+<p id="status" data-i18n="pair.intro_app_settings">This device uses the connection settings configured in the app settings.</p>
 <div class="buttons">
-  <button id="add" class="button" data-i18n="pair.add">Add Device</button>
+  <button id="add" class="button" data-i18n="pair.add" disabled>Add Device</button>
 </div>
 
 <div class="messages">

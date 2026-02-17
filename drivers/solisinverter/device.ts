@@ -1,9 +1,15 @@
 import { BaseRegister, MonitoredRegister } from '../solis';
 import { MySolisBaseDevice } from '../basedevice';
 import { HelperService } from '../../helper';
-import { acquireConnection, releaseConnection } from '../connection-manager';
+import { acquireConnection, ConnectionHandle } from '../connection-manager';
 
 export default class SolisInverterDevice extends MySolisBaseDevice {
+
+  private connectionHandle?: ConnectionHandle;
+
+  protected hasBatteryControl(): boolean {
+    return false;
+  }
 
   private getConnectionSettings() {
     return {
@@ -27,7 +33,16 @@ export default class SolisInverterDevice extends MySolisBaseDevice {
     this.log(`Connection settings: ${address}:${port} unit ${unitId}`);
 
     if (!address || !port) {
-      this.log('=== No connection settings configured. Please configure in app settings.');
+      this.log('=== No connection settings configured. Waiting for app settings...');
+      this.homey.settings.on('set', (key: string) => {
+        if (key === 'address' || key === 'port') {
+          const settings = this.getConnectionSettings();
+          if (settings.address && settings.port) {
+            this.log('=== App settings configured, starting polling...');
+            this.startPolling();
+          }
+        }
+      });
       return;
     }
 
@@ -50,15 +65,14 @@ export default class SolisInverterDevice extends MySolisBaseDevice {
       },
     };
 
-    const { socket, client } = acquireConnection(address, port, unitId, this.log.bind(this));
+    this.connectionHandle = acquireConnection(address, port, unitId, this.log.bind(this));
+    const { client } = this.connectionHandle;
 
     this.registerListeners(client, registers);
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
-    socket.on('connect', async () => {
+    this.connectionHandle.onConnect(async () => {
       this.log('=== Connected!');
       await HelperService.delay(2500);
-
       this.active = true;
       this.poll(client, registers, () => this.active);
     });
@@ -67,20 +81,14 @@ export default class SolisInverterDevice extends MySolisBaseDevice {
   async onUninit(): Promise<void> {
     this.log('SolisInverterDevice onUninit');
     this.active = false;
-    const { address, port, unitId } = this.getConnectionSettings();
-    if (address && port) {
-      releaseConnection(address, port, unitId, this.log.bind(this));
-    }
+    this.connectionHandle?.release();
   }
 
   async onDeleted() {
     this.log('SolisInverterDevice has been deleted');
     this.isPolling = false;
     this.active = false;
-    const { address, port, unitId } = this.getConnectionSettings();
-    if (address && port) {
-      releaseConnection(address, port, unitId, this.log.bind(this));
-    }
+    this.connectionHandle?.release();
   }
 }
 

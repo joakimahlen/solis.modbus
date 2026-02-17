@@ -12,7 +12,8 @@
     "deviceid2battery": "Has battery",
     "connect": "Connect",
     "add": "Add Device",
-    "intro_app_settings": "This device uses the connection settings configured in the app settings."
+    "intro_app_settings": "This device uses the connection settings configured in the app settings.",
+    "no_settings": "Please configure the Modbus connection in the app settings first."
   },
   "Unreachable": "Unreachable",
   "Off": "Off",

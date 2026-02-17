@@ -3,6 +3,7 @@
   "title": {
     "en": "Force battery charge source is"
   },
+  "icon": "/assets/charge_source.svg",
   "decimals": 0,
   "getable": true,
   "setable": false,

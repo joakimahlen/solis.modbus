@@ -1,9 +1,13 @@
-import { BaseRegister, MonitoredRegister } from '../solis';
+import { BaseRegister, MonitoredRegister, PollRate } from '../solis';
 import { MySolisBaseDevice } from '../basedevice';
 import { HelperService } from '../../helper';
-import { acquireConnection, releaseConnection } from '../connection-manager';
+import { acquireConnection, ConnectionHandle } from '../connection-manager';
+
+import { filter, isNumber, min, values } from 'lodash';
 
 export default class SolisBatteryDevice extends MySolisBaseDevice {
+
+  private connectionHandle?: ConnectionHandle;
 
   private getConnectionSettings() {
     return {
@@ -26,7 +30,16 @@ export default class SolisBatteryDevice extends MySolisBaseDevice {
     this.log(`Connection settings: ${address}:${port} unit ${unitId}`);
 
     if (!address || !port) {
-      this.log('=== No connection settings configured. Please configure in app settings.');
+      this.log('=== No connection settings configured. Waiting for app settings...');
+      this.homey.settings.on('set', (key: string) => {
+        if (key === 'address' || key === 'port') {
+          const settings = this.getConnectionSettings();
+          if (settings.address && settings.port) {
+            this.log('=== App settings configured, starting polling...');
+            this.startPolling();
+          }
+        }
+      });
       return;
     }
 
@@ -44,15 +57,16 @@ export default class SolisBatteryDevice extends MySolisBaseDevice {
       },
     };
 
-    const { socket, client } = acquireConnection(address, port, unitId, this.log.bind(this));
+    this.connectionHandle = acquireConnection(address, port, unitId, this.log.bind(this));
+    const { client } = this.connectionHandle;
 
     this.registerListeners(client, registers);
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
-    socket.on('connect', async () => {
-      this.log('=== Connected!');
-      await HelperService.delay(2500);
+    const pollingOffset = (min(filter(values(PollRate), isNumber)) || PollRate.PRIO1) / 2;
 
+    this.connectionHandle.onConnect(async () => {
+      this.log(`=== Connected! Delaying poll start by ${pollingOffset}s to stagger with inverter device`);
+      await HelperService.delay(pollingOffset * 1000);
       this.active = true;
       this.poll(client, registers, () => this.active);
     });
@@ -61,20 +75,14 @@ export default class SolisBatteryDevice extends MySolisBaseDevice {
   async onUninit(): Promise<void> {
     this.log('SolisBatteryDevice onUninit');
     this.active = false;
-    const { address, port, unitId } = this.getConnectionSettings();
-    if (address && port) {
-      releaseConnection(address, port, unitId, this.log.bind(this));
-    }
+    this.connectionHandle?.release();
   }
 
   async onDeleted() {
     this.log('SolisBatteryDevice has been deleted');
     this.isPolling = false;
     this.active = false;
-    const { address, port, unitId } = this.getConnectionSettings();
-    if (address && port) {
-      releaseConnection(address, port, unitId, this.log.bind(this));
-    }
+    this.connectionHandle?.release();
   }
 }
 

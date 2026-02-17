@@ -3,6 +3,7 @@
   "title": {
     "en": "Storage control mode"
   },
+  "icon": "/assets/settings.svg",
   "getable": true,
   "setable": false
 }

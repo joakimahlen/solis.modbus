@@ -3,6 +3,7 @@
   "title": {
     "en": "Force charge power"
   },
+  "icon": "/assets/charge_power.svg",
   "getable": true,
   "setable": false,
   "units": {

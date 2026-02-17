@@ -3,15 +3,16 @@
   "title": {
     "en": "Peak shaving max grid power"
   },
+  "icon": "/assets/limit.svg",
   "units": {
-    "en": "kW"
+    "en": "W"
   },
   "insights": true,
   "desc": {
-    "en": "Power in kilowatt (kW)"
+    "en": "Power in watt (W)"
   },
   "chartType": "stepLine",
-  "decimals": 2,
+  "decimals": 0,
   "getable": true,
   "setable": false,
   "uiComponent": "sensor"

@@ -4,9 +4,7 @@
   },
   "class": "battery",
   "energy": {
-    "batteries": [
-      "OTHER"
-    ]
+    "homeBattery": true
   },
   "capabilities": [
     "battery",

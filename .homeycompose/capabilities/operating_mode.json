@@ -3,6 +3,7 @@
   "title": {
     "en": "Operating mode"
   },
+  "icon": "/assets/operational_status.svg",
   "getable": true,
   "setable": false,
   "uiComponent": "sensor",

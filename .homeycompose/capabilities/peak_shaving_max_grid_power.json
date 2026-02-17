@@ -3,6 +3,7 @@
   "title": {
     "en": "Peak shaving max grid power"
   },
+  "icon": "/assets/limit.svg",
   "uiComponent": "slider",
   "getable": true,
   "setable": true,

@@ -284,6 +284,10 @@ export class Solis extends Homey.Device {
     homeyLog: any;
     isPolling = false;
 
+    protected hasBatteryControl(): boolean {
+        return true;
+    }
+
     async onInit() {
         this.homeyLog = new HomeyLog.Log({ homey: this.homey });
         this.lastSuccessfulRead = new Date();
@@ -368,12 +372,12 @@ export class Solis extends Homey.Device {
             pollRate: PollRate.PRIO2,
         },
         PASSIVE_MODE: {
-            reg: { type: MRType.HOLDING, addr: 43311, len: 1, dtype: 'UINT16', scale: 0, capability: 'passive_mode', operation: Operation.TOSTRING },
+            reg: { type: MRType.HOLDING, addr: 43311, len: 1, dtype: 'UINT16', scale: 0, capability: 'passive_mode', operation: Operation.DIRECT },
             pollRate: PollRate.PRIO4,
         },
         TOU_SWITCH: {
             reg: { type: MRType.HOLDING, addr: 43707, len: 1, dtype: 'UINT16', scale: 0, capability: 'tou_slots', operation: Operation.DIRECT },
-            pollRate: PollRate.PRIO1,
+            pollRate: PollRate.PRIO3,
         },
         HOUSE_LOAD_POWER: {
             reg: { type: MRType.INPUT, addr: 33147, len: 1, dtype: 'UINT16', scale: 0, capability: 'measure_power.house_load', operation: Operation.DIRECT },
@@ -527,11 +531,11 @@ export class Solis extends Homey.Device {
         },
         FORCE_CHARGE_POWER: {
             reg: { type: MRType.HOLDING, addr: 43136, len: 1, dtype: 'UINT16', scale: 1, operation: Operation.DIRECT, settable: true },
-            pollRate: PollRate.PRIO1,
+            pollRate: PollRate.PRIO3,
         },
         FORCE_DISCHARGE_POWER: {
             reg: { type: MRType.HOLDING, addr: 43129, len: 1, dtype: 'UINT16', scale: 1, operation: Operation.DIRECT, settable: true },
-            pollRate: PollRate.PRIO1,
+            pollRate: PollRate.PRIO3,
         },
         FORCE_CHARGE_DIRECTION: {
             reg: {
@@ -549,7 +553,9 @@ export class Solis extends Homey.Device {
         FORCE_BATTERY_CHARGE_MODE: {
             reg: {
                 capability: 'force_battery_charge_mode',
-                getValue: (client) => this.chargeMode,
+                // getValue returns current capability value (no-op during polling);
+                // actual value is managed by updateForceChargeCapability()
+                getValue: (client) => this.getCapabilityValue('force_battery_charge_mode'),
                 setValue: (client, value) => this.handleForceBatteryChargeMode(client, value),
                 settable: true,
             },
@@ -558,7 +564,9 @@ export class Solis extends Homey.Device {
         FORCE_BATTERY_CHARGE_MODE_NUM: {
             reg: {
                 capability: 'force_battery_charge_mode_num',
-                getValue: (client) => this.chargeMode,
+                // getValue returns current capability value (no-op during polling);
+                // actual value is managed by updateForceChargeCapability()
+                getValue: (client) => this.getCapabilityValue('force_battery_charge_mode_num'),
                 settable: false,
             },
             pollRate: PollRate.PRIO1,
@@ -583,7 +591,7 @@ export class Solis extends Homey.Device {
         },
         PEAK_SOC: {
             reg: { type: MRType.HOLDING, addr: 43487, len: 1, dtype: 'UINT16', scale: -2, capability: 'peak_soc', operation: Operation.DIRECT, settable: true },
-            pollRate: PollRate.PRIO1,
+            pollRate: PollRate.PRIO2,
         },
         PEAK_SHAVING_MAX_GRID_POWER: {
             reg: {
@@ -612,12 +620,16 @@ export class Solis extends Homey.Device {
         },
     };
 
+    private _chargeMode?: ForceBatteryChargeMode;
+
     get chargeMode(): ForceBatteryChargeMode {
+        if (this._chargeMode != null) return this._chargeMode;
         return this.getSetting('force_battery_charge_mode') as ForceBatteryChargeMode;
     }
 
     set chargeMode(mode: ForceBatteryChargeMode) {
         console.log('= Storing charge mode', mode);
+        this._chargeMode = mode;
         this.setSettings({ force_battery_charge_mode: mode });
     }
 
@@ -734,8 +746,17 @@ export class Solis extends Homey.Device {
 
         this.log('=== Determined force charge mode:', ForceBatteryChargeMode[mode]);
 
+        // Only adopt detected mode as desired mode on initial startup (no stored mode yet)
+        // Never overwrite with UNKNOWN — that would destroy the desired mode
+        if (mode !== ForceBatteryChargeMode.UNKNOWN && (isNil(this.chargeMode) || this.chargeMode === ForceBatteryChargeMode.UNKNOWN)) {
+            this.chargeMode = mode;
+        }
+
         await this.addCapability('force_battery_charge_mode');
         await this.setCapabilityValue('force_battery_charge_mode', `${mode}`);
+
+        await this.addCapability('force_battery_charge_mode_num');
+        await this.setCapabilityValue('force_battery_charge_mode_num', mode);
 
         return mode;
     }
@@ -771,6 +792,17 @@ export class Solis extends Homey.Device {
         await HelperService.delay(10);
 
         return measurement;
+    }
+
+    findCustomRegisterByCapability(capability: string): CustomRegister | undefined {
+        const allRegisters = { ...this.inverterRegisters, ...this.meterRegisters, ...this.batteryRegisters };
+        for (const monitored of Object.values(allRegisters)) {
+            const reg = monitored.reg as CustomRegister;
+            if (reg.capability === capability && reg.getValue !== undefined) {
+                return reg;
+            }
+        }
+        return undefined;
     }
 
     async registerListeners(client: InstanceType<typeof Modbus.client.TCP>, registers: Record<string, MonitoredRegister<BaseRegister>>) {
@@ -822,8 +854,11 @@ export class Solis extends Homey.Device {
                     try {
                         const conditionCard = this.homey.flow.getConditionCard(register.capability!);
                         this.log('=== Registering condition card for:', register.capability);
-                        conditionCard.registerRunListener(async (args, state) => {
-                            let currentValue = await this.getCapabilityValue(register.capability!);
+                        conditionCard.registerRunListener(async (args) => {
+                            // Use args.device (the device selected in the flow) instead of this,
+                            // because registerRunListener is global — the last device to register wins.
+                            const device = args.device || this;
+                            let currentValue = await device.getCapabilityValue(register.capability!);
 
                             // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             const argument = conditionCard.getArgument('argument_main') as any;
@@ -854,10 +889,20 @@ export class Solis extends Homey.Device {
                             const actionCard = this.homey.flow.getActionCard(`${register.capability}_main`);
                             this.log('=== Registering action card for:', register.capability);
                             actionCard.registerRunListener(async (args, state) => {
+                                // Use args.device (the device selected in the flow) instead of this,
+                                // because registerRunListener is global — the last device to register wins.
+                                const targetDevice = (args.device || this) as Solis;
                                 if (isModbusRegister) {
                                     await write(modbusRegister, client, args.argument_main);
                                 } else if (isCustomRegister) {
-                                    await customRegister.setValue!(client, args.argument_main);
+                                    // Look up the register from the target device's own register sets
+                                    // so the arrow function's captured `this` points to the correct device
+                                    const targetRegister = targetDevice.findCustomRegisterByCapability(register.capability!);
+                                    if (targetRegister?.setValue) {
+                                        await targetRegister.setValue(client, args.argument_main);
+                                    } else {
+                                        await customRegister.setValue!(client, args.argument_main);
+                                    }
                                 }
                             });
                         }
@@ -870,6 +915,51 @@ export class Solis extends Homey.Device {
                     this.error(`= Error getting capability: ${register.capability}`, e);
                 }
             });
+
+        // Register custom condition card handlers that override the generic handler
+        try {
+            const peakShavingCard = this.homey.flow.getConditionCard('peak_shaving_max_grid_power');
+            this.log('=== Registering custom condition card for: peak_shaving_max_grid_power');
+            peakShavingCard.registerRunListener(async (args) => {
+                const device = args.device || this;
+                const currentValue = await device.getCapabilityValue('peak_shaving_max_grid_power') as number;
+                let checkResult = false;
+                switch (args.comparison) {
+                    case 'equal':
+                        checkResult = currentValue === args.value;
+                        break;
+                    case 'greater':
+                        checkResult = currentValue > args.value;
+                        break;
+                    case 'less':
+                        checkResult = currentValue < args.value;
+                        break;
+                }
+                this.log(`= Checking condition for peak_shaving_max_grid_power - ${currentValue} ${args.comparison} ${args.value} => ${checkResult}`);
+                return checkResult;
+            });
+        } catch (e) {
+            if (!/Invalid Flow Card ID/.test((e as Error).message)) {
+                this.error('= Error registering peak_shaving_max_grid_power condition card:', e);
+            }
+        }
+
+        try {
+            const lastReadCard = this.homey.flow.getConditionCard('last_successful_read');
+            this.log('=== Registering custom condition card for: last_successful_read');
+            lastReadCard.registerRunListener(async (args) => {
+                const device = args.device || this;
+                const lastRead = device.getSetting('last_successful_read') as Date;
+                const minutesAgo = (Date.now() - lastRead.getTime()) / 60000;
+                const checkResult = minutesAgo <= args.minutes;
+                this.log(`= Checking condition for last_successful_read - ${minutesAgo.toFixed(1)} min ago <= ${args.minutes} min => ${checkResult}`);
+                return checkResult;
+            });
+        } catch (e) {
+            if (!/Invalid Flow Card ID/.test((e as Error).message)) {
+                this.error('= Error registering last_successful_read condition card:', e);
+            }
+        }
     }
 
     private async rewriteChargeModeSetting(client: InstanceType<typeof Modbus.client.TCP>) {
@@ -914,31 +1004,9 @@ export class Solis extends Homey.Device {
                 await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
             }
 
-            await HelperService.delay(2500);
-
-            const storageControlMode = await this.readRegister('STORAGE_CONTROL_MODE', this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client);
-            const operatingMode = await this.readRegister('OPERATING_MODE', this.batteryRegisters.OPERATING_MODE.reg as ModbusRegister, client);
-            const forceChargePower = await this.readRegister('FORCE_CHARGE_POWER', this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client);
-            const forceChargeDirection = await this.readRegister(
-                'FORCE_CHARGE_DIRECTION',
-                this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister,
-                client,
-            );
-            const forceDischargePower = await this.readRegister('FORCE_DISCHARGE_POWER', this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client);
-            const forceChargeSource = await this.readRegister('FORCE_CHARGE_SOURCE', this.batteryRegisters.FORCE_CHARGE_SOURCE.reg as ModbusRegister, client);
-            const forceChargeLimit = await this.readRegister('FORCE_CHARGE_LIMIT', this.batteryRegisters.FORCE_CHARGE_LIMIT.reg as ModbusRegister, client);
-
-            const result = {
-                STORAGE_CONTROL_MODE: storageControlMode,
-                OPERATING_MODE: operatingMode,
-                FORCE_CHARGE_POWER: forceChargePower,
-                FORCE_CHARGE_DIRECTION: forceChargeDirection,
-                FORCE_DISCHARGE_POWER: forceDischargePower,
-                FORCE_CHARGE_SOURCE: forceChargeSource,
-                FORCE_CHARGE_LIMIT: forceChargeLimit,
-            };
-
-            this.updateForceChargeCapability(result);
+            // Don't read back or update force_battery_charge_mode capability here.
+            // The main poll loop detection (executePoll) is the sole source for the capability value,
+            // so condition cards reflect the actual inverter state, not the transient post-rewrite state.
         } catch (error) {
             this.error('Error updating force battery charge mode:', error);
         }
@@ -990,7 +1058,11 @@ export class Solis extends Homey.Device {
 
             const startTime = new Date();
 
-            this.log('= Polling modbus registers... Charge mode is ', ForceBatteryChargeMode[this.chargeMode]);
+            if (this.hasBatteryControl()) {
+                this.log(`= [${this.getName()}] Polling modbus registers... Charge mode is `, ForceBatteryChargeMode[this.chargeMode]);
+            } else {
+                this.log(`= [${this.getName()}] Polling modbus registers...`);
+            }
             for (const key of Object.keys(registers)) {
                 const register = registers[key] as MonitoredRegister<ModbusRegister>;
 
@@ -1053,13 +1125,14 @@ export class Solis extends Homey.Device {
                     this.log(`= Calculated add for ${register.reg.registers.join(' + ')} = ${values.join(' + ')} = ${compoundValue}`);
                     compoundValue = sum(values);
                 } else if (register.reg.operation === 'power_direction') {
+                    // Homey convention: positive = charging (consuming), negative = discharging (delivering)
                     const [rawPower, direction] = values;
                     switch (direction) {
                         case BatteryChargeDirection.CHARGE:
-                            compoundValue = -1 * rawPower;
+                            compoundValue = rawPower;
                             break;
                         case BatteryChargeDirection.DISCHARGE:
-                            compoundValue = rawPower;
+                            compoundValue = -1 * rawPower;
                             break;
                         default:
                             compoundValue = 0;
@@ -1103,20 +1176,22 @@ export class Solis extends Homey.Device {
                 }
             }
 
-            let detectedMode = ForceBatteryChargeMode.UNKNOWN;
-            try {
-                detectedMode = await this.updateForceChargeCapability(results);
-            } catch (error) {
-                this.log('error updating force charge capability!', (error as Error).message);
-            }
-
-            try {
-                if (!isNil(this.chargeMode) && this.chargeMode !== ForceBatteryChargeMode.UNKNOWN && this.chargeMode !== detectedMode) {
-                    this.log(`=== Detected ${detectedMode}, rewriting force charge to ${this.chargeMode} ===`);
-                    await this.rewriteChargeModeSetting(client);
+            if (this.hasBatteryControl()) {
+                let detectedMode = ForceBatteryChargeMode.UNKNOWN;
+                try {
+                    detectedMode = await this.updateForceChargeCapability(results);
+                } catch (error) {
+                    this.log('error updating force charge capability!', (error as Error).message);
                 }
-            } catch (error) {
-                this.log('error rewriting charge mode setting!', (error as Error).message);
+
+                try {
+                    if (!isNil(this.chargeMode) && this.chargeMode !== ForceBatteryChargeMode.UNKNOWN && this.chargeMode !== detectedMode) {
+                        this.log(`=== Detected ${detectedMode}, rewriting force charge to ${this.chargeMode} ===`);
+                        await this.rewriteChargeModeSetting(client);
+                    }
+                } catch (error) {
+                    this.log('error rewriting charge mode setting!', (error as Error).message);
+                }
             }
 
             const endTime = new Date();

@@ -36,6 +36,28 @@ Key registers controlled:
 - `43136` - Force charge power (W)
 - `43129` - Force discharge power (W)
 
+### CRITICAL: Force Charge Mode Rewrite Mechanism
+
+**This is the single most important function in the entire app. Bugs here cause real-world damage — e.g. the battery being fully depleted during expensive peak periods.**
+
+Solis inverters are known to randomly detect and override Modbus register values that we have written. The app must continuously enforce the user's desired mode by rewriting registers when the inverter tampers with them.
+
+The mechanism works as follows:
+
+1. **Desired mode** (`this.chargeMode`): Set only by explicit user action via `handleForceBatteryChargeMode`. Persisted to Homey settings so it survives app restarts. This is the source of truth for what the user wants.
+
+2. **Detected mode** (return value of `updateForceChargeCapability`): Determined each poll cycle by reading register values and matching them against known mode patterns. Shown in the UI capability but **must never overwrite** the desired mode (except on initial startup when no desired mode exists yet).
+
+3. **Rewrite check** (in `executePoll`): Each poll cycle, if the detected mode differs from the desired mode, `rewriteChargeModeSetting` rewrites all registers to enforce the desired mode.
+
+**Invariant that must never be violated:** `updateForceChargeCapability` must NOT overwrite `this.chargeMode` with UNKNOWN or with any detected mode when a valid desired mode is already stored. Doing so destroys the desired mode and disables the rewrite mechanism entirely, leaving the inverter free to do whatever it wants.
+
+Key methods:
+- `updateForceChargeCapability()` — Detects current mode from registers. Only sets `this.chargeMode` on initial startup (when no stored mode exists).
+- `rewriteChargeModeSetting()` — Writes all registers for the desired mode. Called when detected != desired.
+- `handleForceBatteryChargeMode()` — Entry point for user-initiated mode changes. Sets `this.chargeMode` and triggers rewrite.
+- `executePoll()` — Orchestrates detection and rewrite each cycle.
+
 ## Project Structure
 
 ```
