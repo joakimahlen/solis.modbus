@@ -571,7 +571,7 @@
         "id": "force_battery_charge_mode_main"
       },
       {
-        "id": "changedforce_battery_charge_power",
+        "id": "force_battery_charge_power_main",
         "title": {
           "en": "Set force battery charge power"
         },
@@ -600,7 +600,7 @@
         ]
       },
       {
-        "id": "changedforce_battery_discharge_power",
+        "id": "force_battery_discharge_power_main",
         "title": {
           "en": "Set force battery discharge power"
         },

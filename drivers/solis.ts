@@ -884,8 +884,14 @@ export class Solis extends Homey.Device {
                             this.log(`= Checking condition for ${register.capability} - ${args.argument_main}: ${currentValue} => ${checkResult}`);
                             return checkResult;
                         });
+                    } catch (e) {
+                        if (!/Invalid Flow Card ID/.test((e as Error).message)) {
+                            this.error(`= Skipping condition card for capability: ${register.capability} - ${(e as Error).message}`);
+                        }
+                    }
 
-                        if (isSettable) {
+                    if (isSettable) {
+                        try {
                             const actionCard = this.homey.flow.getActionCard(`${register.capability}_main`);
                             this.log('=== Registering action card for:', register.capability);
                             actionCard.registerRunListener(async (args, state) => {
@@ -905,10 +911,10 @@ export class Solis extends Homey.Device {
                                     }
                                 }
                             });
-                        }
-                    } catch (e) {
-                        if (!/Invalid Flow Card ID/.test((e as Error).message)) {
-                            this.error(`= Skipping flow cards for capability: ${register.capability} - ${(e as Error).message}`);
+                        } catch (e) {
+                            if (!/Invalid Flow Card ID/.test((e as Error).message)) {
+                                this.error(`= Skipping action card for capability: ${register.capability} - ${(e as Error).message}`);
+                            }
                         }
                     }
                 } catch (e) {
