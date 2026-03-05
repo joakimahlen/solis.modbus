@@ -729,8 +729,10 @@ export class Solis extends Homey.Device {
             chargeDirection === ForceBatteryChargeDirection.CHARGE &&
             hasChargeLimit &&
             dischargePower === 0 &&
-            chargePower === 0;
+            chargePower > 0;
         let mode = ForceBatteryChargeMode.UNKNOWN;
+
+        this.log(`=== Detection: src=${chargeSource} dir=${chargeDirection} chgPwr=${chargePower} disPwr=${dischargePower} limit=${chargeLimit} storage=${storageControlMode} isChg=${isCharging} isDis=${isDischarging} isIdle=${isIdle}`);
 
         if (isCharging && storageControlMode === ForceStorageModes[ForceBatteryChargeMode.CHARGE]) {
             mode = ForceBatteryChargeMode.CHARGE;
@@ -996,7 +998,7 @@ export class Solis extends Homey.Device {
             } else if (this.chargeMode === ForceBatteryChargeMode.IDLE) {
                 await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.ON);
                 await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
-                await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, 0);
+                await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, FORCE_CHARGE_POWER_LIMIT);
                 await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.CHARGE);
                 await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, 0);
             } else if (this.chargeMode === ForceBatteryChargeMode.PEAK_SHAVING) {
