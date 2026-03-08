@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs sed -i '' 's/soliswithbatt|//g')",
+      "Bash(npx homey-app build)",
+      "Bash(homey app build)"
+    ],
+    "additionalDirectories": []
+  }
+}

@@ -291,27 +291,6 @@ export class Solis extends Homey.Device {
     async onInit() {
         this.homeyLog = new HomeyLog.Log({ homey: this.homey });
         this.lastSuccessfulRead = new Date();
-
-        /*
-                                            const oldCapabilities = [
-                                                'measure_power.force_charge_power',
-                                                'measure_power.force_discharge_power',
-                                                'force_charge_power',
-                                                'force_discharge_power',
-                                            ];
-    
-                                            oldCapabilities.forEach(async (oldCapability) => {
-                                                if (this.hasCapability(oldCapability)) {
-                                                    this.log(`======= Removing old capability: ${oldCapability}`);
-                                                    try {
-                                                        await this.removeCapability(oldCapability);
-                                                        this.log(`======= Removed old capability: ${oldCapability}`);
-                                                    } catch (e) {
-                                                        this.log(`======= Error removing old capability: ${oldCapability}`);
-                                                    }
-                                                }
-                                            });
-                                            */
     }
 
     inverterRegisters: Record<string, MonitoredRegister<BaseRegister>> = {

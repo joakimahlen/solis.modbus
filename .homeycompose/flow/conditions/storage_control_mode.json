@@ -91,7 +91,7 @@
     {
       "type": "device",
       "name": "device",
-      "filter": "driver_id=soliswithbatt|solisbattery"
+      "filter": "driver_id=solisbattery"
     }
   ]
 }

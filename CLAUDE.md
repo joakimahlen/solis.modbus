@@ -81,8 +81,8 @@ drivers/
   solis.ts           # Core Solis class with all register definitions and mode logic
   basedevice.ts      # Abstract base with Modbus TCP connection management
   response.ts        # Modbus read/write helpers
-  solis/             # Basic inverter driver (no battery)
-  soliswithbatt/     # Battery-equipped inverter driver
+  solisinverter/     # Inverter-only driver (no battery)
+  solisbattery/      # Battery-only driver
 ```
 
 ## Key Files
