@@ -1,0 +1,19 @@
+{
+  "type": "number",
+  "title": {
+    "en": "Force export power"
+  },
+  "desc": {
+    "en": "Set the forced grid export power level"
+  },
+  "icon": "/assets/limit.svg",
+  "uiComponent": "slider",
+  "getable": true,
+  "setable": true,
+  "units": {
+    "en": "W"
+  },
+  "min": 0,
+  "max": 10000,
+  "step": 200
+}

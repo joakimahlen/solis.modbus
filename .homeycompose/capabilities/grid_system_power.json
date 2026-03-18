@@ -1,0 +1,12 @@
+{
+  "type": "number",
+  "title": {
+    "en": "Grid system power"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": null,
+  "units": {
+    "en": "W"
+  }
+}

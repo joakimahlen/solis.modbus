@@ -10,7 +10,7 @@
     "format": "prettier --write .",
     "lint": "eslint . --ext .js,.ts",
     "validate": "homey app validate",
-    "build": "homey app build"
+    "build": "tsc"
   },
   "devDependencies": {
     "@tsconfig/node16": "^16.1.3",

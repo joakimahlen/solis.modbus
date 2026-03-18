@@ -1,0 +1,29 @@
+{
+  "id": "force_battery_export_power_main",
+  "title": {
+    "en": "Set force battery export power"
+  },
+  "titleFormatted": {
+    "en": "Set force battery export power to [[argument_main]]"
+  },
+  "args": [
+    {
+      "type": "number",
+      "name": "argument_main",
+      "title": {
+        "en": "Force battery export power (W)"
+      },
+      "placeholder": {
+        "en": "1000"
+      },
+      "min": 0,
+      "max": 10000,
+      "step": 200
+    },
+    {
+      "type": "device",
+      "name": "device",
+      "filter": "driver_id=solisbattery"
+    }
+  ]
+}

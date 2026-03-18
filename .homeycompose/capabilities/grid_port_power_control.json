@@ -1,0 +1,9 @@
+{
+  "type": "number",
+  "title": {
+    "en": "Grid port power control"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": null
+}

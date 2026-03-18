@@ -19,6 +19,7 @@ export enum ForceBatteryChargeMode {
     CHARGE = 2,
     DISCHARGE = 3,
     IDLE = 4,
+    EXPORT = 5,
 }
 
 export enum PassiveMode {
@@ -87,6 +88,7 @@ export const ForceStorageModes: Record<ForceBatteryChargeMode, number> = {
         StorageControlMode.BATTERY_FORCE_CHARGE_PEAK_SHAVING,
     [ForceBatteryChargeMode.DISCHARGE]: StorageControlMode.SELF_USE_MODE | StorageControlMode.BATTERY_FORCE_CHARGE_PEAK_SHAVING,
     [ForceBatteryChargeMode.IDLE]: StorageControlMode.SELF_USE_MODE | StorageControlMode.BATTERY_FORCE_CHARGE_PEAK_SHAVING,
+    [ForceBatteryChargeMode.EXPORT]: StorageControlMode.SELF_USE_MODE | StorageControlMode.BATTERY_FORCE_CHARGE_PEAK_SHAVING,
 };
 
 export const DEVICE_OPERATING_MODES: { [key: string]: string } = {
@@ -568,6 +570,33 @@ export class Solis extends Homey.Device {
             },
             pollRate: PollRate.PRIO2,
         },
+        FORCE_BATTERY_EXPORT_POWER: {
+            reg: {
+                capability: 'force_battery_export_power',
+                getValue: (client) => this.getSetting('force_battery_export_power'),
+                setValue: async (client, value) => {
+                    this.setSetting('force_battery_export_power', value);
+                    if (this.chargeMode === ForceBatteryChargeMode.EXPORT) {
+                        this.log(`= Export power changed to ${value}W, triggering rewrite`);
+                        await this.rewriteChargeModeSetting(client);
+                    }
+                },
+                settable: true,
+            },
+            pollRate: PollRate.PRIO2,
+        },
+        GRID_PORT_POWER: {
+            reg: { type: MRType.HOLDING, addr: 43128, len: 1, dtype: 'INT16', scale: 1, capability: 'grid_port_power', operation: Operation.DIRECT, settable: true },
+            pollRate: PollRate.PRIO1,
+        },
+        GRID_SYSTEM_POWER: {
+            reg: { type: MRType.HOLDING, addr: 43133, len: 1, dtype: 'INT16', scale: 1, capability: 'grid_system_power', operation: Operation.DIRECT, settable: true },
+            pollRate: PollRate.PRIO1,
+        },
+        GRID_PORT_POWER_CONTROL: {
+            reg: { type: MRType.HOLDING, addr: 43132, len: 1, dtype: 'UINT16', scale: 0, capability: 'grid_port_power_control', operation: Operation.DIRECT, settable: true },
+            pollRate: PollRate.PRIO1,
+        },
         PEAK_SOC: {
             reg: { type: MRType.HOLDING, addr: 43487, len: 1, dtype: 'UINT16', scale: -2, capability: 'peak_soc', operation: Operation.DIRECT, settable: true },
             pollRate: PollRate.PRIO2,
@@ -618,6 +647,10 @@ export class Solis extends Homey.Device {
 
     get dischargePower(): number {
         return this.getSetting('force_battery_discharge_power');
+    }
+
+    get exportPower(): number {
+        return this.getSetting('force_battery_export_power');
     }
 
     get lastSuccessfulRead(): Date {
@@ -697,6 +730,9 @@ export class Solis extends Homey.Device {
 
         const chargeDirection: ForceBatteryChargeDirection = result.FORCE_CHARGE_DIRECTION?.computedValue as number;
         const storageControlMode: StorageControlMode = result.STORAGE_CONTROL_MODE?.computedValue as number;
+        const gridPortPower = result.GRID_PORT_POWER?.computedValue as number;
+        const gridSystemPower = result.GRID_SYSTEM_POWER?.computedValue as number;
+        const gridPortPowerControl = result.GRID_PORT_POWER_CONTROL?.computedValue as number;
 
         const hasChargeLimit = chargeLimit !== 0;
         const isCharging = chargeSource === ForceBatteryChargeSource.GRID_AND_PV && chargeDirection === ForceBatteryChargeDirection.CHARGE && hasChargeLimit;
@@ -709,12 +745,17 @@ export class Solis extends Homey.Device {
             hasChargeLimit &&
             dischargePower === 0 &&
             chargePower === 0;
+        const isExporting = (gridPortPowerControl === 1 && gridSystemPower > 0 ||
+            gridPortPowerControl === 2 && gridPortPower > 0) &&
+            chargeDirection === ForceBatteryChargeDirection.OFF;
         let mode = ForceBatteryChargeMode.UNKNOWN;
 
-        this.log(`=== Detection: src=${chargeSource} dir=${chargeDirection} chgPwr=${chargePower} disPwr=${dischargePower} limit=${chargeLimit} storage=${storageControlMode} isChg=${isCharging} isDis=${isDischarging} isIdle=${isIdle}`);
+        this.log(`=== Detection: src=${chargeSource} dir=${chargeDirection} chgPwr=${chargePower} disPwr=${dischargePower} limit=${chargeLimit} storage=${storageControlMode} gridCtrl=${gridPortPowerControl} gridPort=${gridPortPower} gridSys=${gridSystemPower} isChg=${isCharging} isDis=${isDischarging} isIdle=${isIdle} isExp=${isExporting}`);
 
         if (isCharging && storageControlMode === ForceStorageModes[ForceBatteryChargeMode.CHARGE]) {
             mode = ForceBatteryChargeMode.CHARGE;
+        } else if (isExporting && storageControlMode === ForceStorageModes[ForceBatteryChargeMode.EXPORT]) {
+            mode = ForceBatteryChargeMode.EXPORT;
         } else if (isDischarging && storageControlMode === ForceStorageModes[ForceBatteryChargeMode.DISCHARGE]) {
             mode = ForceBatteryChargeMode.DISCHARGE;
         } else if (isIdle && storageControlMode === ForceStorageModes[ForceBatteryChargeMode.IDLE]) {
@@ -960,6 +1001,13 @@ export class Solis extends Homey.Device {
             await write(this.batteryRegisters.FORCE_CHARGE_LIMIT.reg as ModbusRegister, client, FORCE_CHARGE_POWER_LIMIT);
             await write(this.batteryRegisters.FORCE_CHARGE_SOURCE.reg as ModbusRegister, client, ForceBatteryChargeSource.GRID_AND_PV);
 
+            // Reset grid power control when not in EXPORT mode
+            if (this.chargeMode !== ForceBatteryChargeMode.EXPORT) {
+                await write(this.batteryRegisters.GRID_PORT_POWER_CONTROL.reg as ModbusRegister, client, 0);
+                await write(this.batteryRegisters.GRID_PORT_POWER.reg as ModbusRegister, client, 0);
+                await write(this.batteryRegisters.GRID_SYSTEM_POWER.reg as ModbusRegister, client, 0);
+            }
+
             const forceStorageMode = ForceStorageModes[this.chargeMode];
 
             if (this.chargeMode === ForceBatteryChargeMode.CHARGE) {
@@ -986,6 +1034,16 @@ export class Solis extends Homey.Device {
                 await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, 0);
                 await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.DISCHARGE);
                 await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, this.dischargePower);
+            } else if (this.chargeMode === ForceBatteryChargeMode.EXPORT) {
+                this.log(`=== EXPORT: writing grid system power=${this.exportPower}W, storage=${forceStorageMode}, grid control=1, passive=OFF`);
+                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.OFF);
+                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
+                await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, 0);
+                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.OFF);
+                await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, 0);
+                await write(this.batteryRegisters.GRID_PORT_POWER.reg as ModbusRegister, client, 0);
+                await write(this.batteryRegisters.GRID_PORT_POWER_CONTROL.reg as ModbusRegister, client, 1);
+                await write(this.batteryRegisters.GRID_SYSTEM_POWER.reg as ModbusRegister, client, this.exportPower);
             } else {
                 await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.OFF);
                 await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);

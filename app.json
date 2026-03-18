@@ -319,6 +319,12 @@
                 "title": {
                   "en": "Idle"
                 }
+              },
+              {
+                "id": "5",
+                "title": {
+                  "en": "Export"
+                }
               }
             ]
           },
@@ -559,6 +565,12 @@
                 "title": {
                   "en": "Idle"
                 }
+              },
+              {
+                "id": "5",
+                "title": {
+                  "en": "Export"
+                }
               }
             ]
           },
@@ -629,6 +641,35 @@
         ]
       },
       {
+        "id": "force_battery_export_power_main",
+        "title": {
+          "en": "Set force battery export power"
+        },
+        "titleFormatted": {
+          "en": "Set force battery export power to [[argument_main]]"
+        },
+        "args": [
+          {
+            "type": "number",
+            "name": "argument_main",
+            "title": {
+              "en": "Force battery export power (W)"
+            },
+            "placeholder": {
+              "en": "1000"
+            },
+            "min": 0,
+            "max": 10000,
+            "step": 200
+          },
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=solisbattery"
+          }
+        ]
+      },
+      {
         "id": "peak_shaving_max_grid_power_main",
         "title": {
           "en": "Set peak shaving max grid power"
@@ -682,10 +723,14 @@
         "measure_power.force_charge_limit",
         "force_battery_charge_power",
         "force_battery_discharge_power",
+        "force_battery_export_power",
         "force_charge_power",
         "force_discharge_power",
         "force_charge_direction",
         "passive_mode",
+        "grid_port_power",
+        "grid_port_power_control",
+        "grid_system_power",
         "peak_shaving_max_grid_power",
         "peak_soc"
       ],
@@ -1028,6 +1073,12 @@
           "title": {
             "en": "Idle"
           }
+        },
+        {
+          "id": "5",
+          "title": {
+            "en": "Export"
+          }
         }
       ]
     },
@@ -1065,6 +1116,25 @@
       "desc": {
         "en": "Set the forced discharge power level"
       },
+      "uiComponent": "slider",
+      "getable": true,
+      "setable": true,
+      "units": {
+        "en": "W"
+      },
+      "min": 0,
+      "max": 10000,
+      "step": 200
+    },
+    "force_battery_export_power": {
+      "type": "number",
+      "title": {
+        "en": "Force export power"
+      },
+      "desc": {
+        "en": "Set the forced grid export power level"
+      },
+      "icon": "/assets/limit.svg",
       "uiComponent": "slider",
       "getable": true,
       "setable": true,
@@ -1116,6 +1186,39 @@
       "icon": "/assets/discharge_power.svg",
       "getable": true,
       "setable": false,
+      "units": {
+        "en": "W"
+      }
+    },
+    "grid_port_power": {
+      "type": "number",
+      "title": {
+        "en": "Grid port power"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": null,
+      "units": {
+        "en": "W"
+      }
+    },
+    "grid_port_power_control": {
+      "type": "number",
+      "title": {
+        "en": "Grid port power control"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": null
+    },
+    "grid_system_power": {
+      "type": "number",
+      "title": {
+        "en": "Grid system power"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": null,
       "units": {
         "en": "W"
       }
