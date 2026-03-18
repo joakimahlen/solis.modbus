@@ -1010,43 +1010,48 @@ export class Solis extends Homey.Device {
 
             const forceStorageMode = ForceStorageModes[this.chargeMode];
 
+            // Write order: set parameters (power, direction) first, then storage control mode,
+            // then passive mode last. This prevents brief unintended states where the inverter
+            // enters passive mode before knowing what charge/discharge behavior to follow.
             if (this.chargeMode === ForceBatteryChargeMode.CHARGE) {
-                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.ON);
-                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
                 await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, this.chargePower);
-                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.CHARGE);
                 await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, 0);
+                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.CHARGE);
+                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
+                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.ON);
             } else if (this.chargeMode === ForceBatteryChargeMode.DISCHARGE) {
-                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.ON);
-                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
                 await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, 0);
-                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.DISCHARGE);
                 await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, this.dischargePower);
+                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.DISCHARGE);
+                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
+                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.ON);
             } else if (this.chargeMode === ForceBatteryChargeMode.IDLE) {
-                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.ON);
-                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
                 await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, 0);
-                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.CHARGE);
                 await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, 0);
-            } else if (this.chargeMode === ForceBatteryChargeMode.PEAK_SHAVING) {
-                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.ON);
+                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.CHARGE);
                 await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
+                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.ON);
+            } else if (this.chargeMode === ForceBatteryChargeMode.PEAK_SHAVING) {
                 await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, 0);
-                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.DISCHARGE);
                 await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, this.dischargePower);
+                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.DISCHARGE);
+                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
+                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.ON);
             } else if (this.chargeMode === ForceBatteryChargeMode.EXPORT) {
                 this.log(`=== EXPORT: writing grid system power=${this.exportPower}W, storage=${forceStorageMode}, grid control=1, passive=OFF`);
+                // EXPORT needs passive mode OFF — disable it first before setting up grid control
                 await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.OFF);
-                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
                 await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, 0);
-                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.OFF);
                 await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, 0);
+                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.OFF);
+                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
                 await write(this.batteryRegisters.GRID_PORT_POWER.reg as ModbusRegister, client, 0);
                 await write(this.batteryRegisters.GRID_PORT_POWER_CONTROL.reg as ModbusRegister, client, 1);
                 await write(this.batteryRegisters.GRID_SYSTEM_POWER.reg as ModbusRegister, client, this.exportPower);
             } else {
-                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.OFF);
+                // SELF_USE: disable passive mode, restore normal inverter intelligence
                 await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
+                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.OFF);
             }
 
             // Don't read back or update force_battery_charge_mode capability here.
