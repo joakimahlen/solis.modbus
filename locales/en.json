@@ -1,33 +1,21 @@
 {
   "pair": {
     "title": "Add Solis Inverter",
-    "nosettings": "Please fill in all the required fields.",
-    "intro": "Enter the IP address and port of your inverter and set the polling frequency.",
+    "title_battery": "Add Solis Battery",
+    "intro": "Enter the Modbus TCP connection details for your Solis inverter.",
+    "name": "Name",
     "address": "IP Address",
     "port": "Port",
-    "polling": "Polling Frequency",
-    "deviceid": "Device ID",
-    "deviceidbattery": "Has battery",
-    "deviceid2": "Device ID2",
-    "deviceid2battery": "Has battery",
-    "connect": "Connect",
+    "inverterid": "Inverter ID",
     "add": "Add Device",
-    "intro_app_settings": "This device uses the connection settings configured in the app settings.",
-    "no_settings": "Please configure the Modbus connection in the app settings first."
+    "missing_address": "Please enter an IP address.",
+    "missing_port": "Please enter a valid port number.",
+    "invalid_inverterid": "Inverter ID must be between 0 and 50."
   },
   "Unreachable": "Unreachable",
   "Off": "Off",
   "BatteryStandby": "Battery Standby",
   "Charge": "Battery Charging",
   "Discharge": "Battery Discharging",
-  "NA": "Information Not Available",
-  "settings": {
-    "title": "Modbus Connection",
-    "description": "Configure the Modbus TCP connection to your Solis inverter. These settings are shared by all Solis devices.",
-    "address": "IP Address",
-    "port": "Port",
-    "inverterid": "Inverter ID",
-    "save": "Save",
-    "saved": "Settings saved."
-  }
+  "NA": "Information Not Available"
 }

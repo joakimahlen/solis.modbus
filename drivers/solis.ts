@@ -285,6 +285,7 @@ export class Solis extends Homey.Device {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     homeyLog: any;
     isPolling = false;
+    private idleBaseline = 0;
 
     protected hasBatteryControl(): boolean {
         return true;
@@ -292,7 +293,6 @@ export class Solis extends Homey.Device {
 
     async onInit() {
         this.homeyLog = new HomeyLog.Log({ homey: this.homey });
-        this.lastSuccessfulRead = new Date();
     }
 
     inverterRegisters: Record<string, MonitoredRegister<BaseRegister>> = {
@@ -977,8 +977,12 @@ export class Solis extends Homey.Device {
             this.log('=== Registering custom condition card for: last_successful_read');
             lastReadCard.registerRunListener(async (args) => {
                 const device = args.device || this;
-                const lastRead = device.getSetting('last_successful_read') as Date;
-                const minutesAgo = (Date.now() - lastRead.getTime()) / 60000;
+                const lastRead = device.getSetting('last_successful_read') as Date | null;
+                if (!lastRead) {
+                    this.log('= Checking condition for last_successful_read - never read => false');
+                    return false;
+                }
+                const minutesAgo = (Date.now() - new Date(lastRead).getTime()) / 60000;
                 const checkResult = minutesAgo <= args.minutes;
                 this.log(`= Checking condition for last_successful_read - ${minutesAgo.toFixed(1)} min ago <= ${args.minutes} min => ${checkResult}`);
                 return checkResult;
@@ -1087,7 +1091,7 @@ export class Solis extends Homey.Device {
     }
 
     private async executePoll(client: InstanceType<typeof Modbus.client.TCP>, registers: Record<string, MonitoredRegister<BaseRegister>>, active: () => boolean) {
-        this.lastSuccessfulRead = new Date();
+        this.idleBaseline = Date.now();
         const highestPollRate = min(filter(values(PollRate), isNumber)) || PollRate.PRIO4;
 
         let accumulatedTime = 0;
@@ -1100,7 +1104,7 @@ export class Solis extends Homey.Device {
                 return;
             }
 
-            if (client.connectionState === 'online' && Date.now() - this.lastSuccessfulRead.getTime() > IDLE_RECONNECT_TIMEOUT) {
+            if (client.connectionState === 'online' && Date.now() - this.idleBaseline > IDLE_RECONNECT_TIMEOUT) {
                 this.log('== No successful read for a while, reconnecting client...');
                 client.socket.destroy(new Error('Reconnecting due to idle timeout'));
                 return;
@@ -1127,7 +1131,9 @@ export class Solis extends Homey.Device {
 
                 try {
                     const result = await this.readRegister(key, register.reg, client);
-                    this.lastSuccessfulRead = new Date();
+                    const now = new Date();
+                    this.lastSuccessfulRead = now;
+                    this.idleBaseline = now.getTime();
                     results[key] = result;
                 } catch (error) {
                     this.log(`=== error reading register ${register.reg.addr} - '${(error as Error).message}'`);

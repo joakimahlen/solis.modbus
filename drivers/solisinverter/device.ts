@@ -12,10 +12,11 @@ export default class SolisInverterDevice extends MySolisBaseDevice {
   }
 
   private getConnectionSettings() {
+    const settings = this.getSettings();
     return {
-      address: this.homey.settings.get('address') as string,
-      port: this.homey.settings.get('port') as number,
-      unitId: this.homey.settings.get('inverterid') as number ?? 1,
+      address: settings.address as string,
+      port: settings.port as number,
+      unitId: (settings.inverterid as number) ?? 1,
     };
   }
 
@@ -33,18 +34,12 @@ export default class SolisInverterDevice extends MySolisBaseDevice {
     this.log(`Connection settings: ${address}:${port} unit ${unitId}`);
 
     if (!address || !port) {
-      this.log('=== No connection settings configured. Waiting for app settings...');
-      this.homey.settings.on('set', (key: string) => {
-        if (key === 'address' || key === 'port') {
-          const settings = this.getConnectionSettings();
-          if (settings.address && settings.port) {
-            this.log('=== App settings configured, starting polling...');
-            this.startPolling();
-          }
-        }
-      });
+      this.log('=== No connection settings configured on device. Please configure in device settings.');
+      await this.setUnavailable('Please configure IP address and port in device settings.');
       return;
     }
+
+    await this.setAvailable();
 
     // Build register map with capability remapping:
     // - PV_POWER → measure_power (primary power for this device)
@@ -76,6 +71,23 @@ export default class SolisInverterDevice extends MySolisBaseDevice {
       this.active = true;
       this.poll(client, registers, () => this.active);
     });
+  }
+
+  async onSettings({ changedKeys }: {
+    oldSettings: Record<string, unknown>;
+    newSettings: Record<string, unknown>;
+    changedKeys: string[];
+  }): Promise<void> {
+    const connectionKeys = ['address', 'port', 'inverterid'];
+    if (!changedKeys.some((k) => connectionKeys.includes(k))) {
+      return;
+    }
+    this.log('Connection settings changed, restarting polling');
+    this.active = false;
+    this.isPolling = false;
+    this.connectionHandle?.release();
+    this.connectionHandle = undefined;
+    setImmediate(() => this.startPolling());
   }
 
   async onUninit(): Promise<void> {

@@ -2,29 +2,54 @@
   Homey.setTitle(__('pair.title'));
 
   $(function () {
-    // Check if app settings are configured
-    Homey.getSettings(function (err, settings) {
-      if (!err && settings && settings.address) {
-        $('#status').html(__('pair.intro_app_settings'));
-        $('#add').prop('disabled', false);
-      } else {
-        $('#status').html(__('pair.no_settings'));
-        $('#add').prop('disabled', true);
-      }
-    });
+    var $address = $('#address');
+    var $port = $('#port');
+    var $inverterid = $('#inverterid');
+    var $name = $('#name');
+    var $add = $('#add');
+    var $error = $('.solis-error');
+    var $errorMsg = $('.solis-error-msg');
 
-    $('#add').click(function () {
+    $add.click(function () {
+      var address = $.trim($address.val());
+      var port = Number($port.val());
+      var inverterid = Number($inverterid.val());
+      var name = $.trim($name.val()) || 'Solis Inverter';
+
+      $error.hide();
+
+      if (!address) {
+        $errorMsg.html(__('pair.missing_address'));
+        $error.show();
+        return;
+      }
+      if (!port || port <= 0) {
+        $errorMsg.html(__('pair.missing_port'));
+        $error.show();
+        return;
+      }
+      if (isNaN(inverterid) || inverterid < 0 || inverterid > 50) {
+        $errorMsg.html(__('pair.invalid_inverterid'));
+        $error.show();
+        return;
+      }
+
       var deviceId = Math.random().toString(36).substr(2, 5).toLowerCase();
 
       Homey.addDevice(
         {
-          name: 'Solis Inverter',
+          name: name,
           data: { id: deviceId },
+          settings: {
+            address: address,
+            port: port,
+            inverterid: inverterid,
+          },
         },
-        function (error, result) {
+        function (error) {
           if (error) {
-            $('.solis-error').show();
-            $('.solis-error-msg').html(error.message || error.toString());
+            $errorMsg.html(error.message || error.toString());
+            $error.show();
             return;
           }
           Homey.done();
@@ -35,6 +60,19 @@
 </script>
 
 <style type="text/css">
+  .form-group {
+    display: block;
+    margin-bottom: 10px;
+  }
+  .form-group label {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .form-group input {
+    width: 100%;
+    box-sizing: border-box;
+  }
   .buttons {
     padding-top: 14px;
   }
@@ -44,9 +82,29 @@
   }
 </style>
 
-<p id="status" data-i18n="pair.intro_app_settings">This device uses the connection settings configured in the app settings.</p>
+<p data-i18n="pair.intro">Enter the Modbus TCP connection details for your Solis inverter.</p>
+
+<fieldset>
+  <div class="form-group">
+    <label for="name" data-i18n="pair.name">Name</label>
+    <input type="text" id="name" placeholder="Solis Inverter" />
+  </div>
+  <div class="form-group">
+    <label for="address" data-i18n="pair.address">IP Address</label>
+    <input type="text" id="address" placeholder="0.0.0.0" />
+  </div>
+  <div class="form-group">
+    <label for="port" data-i18n="pair.port">Port</label>
+    <input type="number" id="port" value="502" />
+  </div>
+  <div class="form-group">
+    <label for="inverterid" data-i18n="pair.inverterid">Inverter ID</label>
+    <input type="number" id="inverterid" value="1" min="0" max="50" />
+  </div>
+</fieldset>
+
 <div class="buttons">
-  <button id="add" class="button" data-i18n="pair.add" disabled>Add Device</button>
+  <button id="add" class="button" data-i18n="pair.add">Add Device</button>
 </div>
 
 <div class="messages">
