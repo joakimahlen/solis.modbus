@@ -3,7 +3,7 @@ import * as HomeyLog from 'homey-log';
 import * as Modbus from 'jsmodbus';
 
 import { filter, isNil, isNumber, min, multiply, reduce, sum, values } from 'lodash';
-import { read, write } from './response';
+import { read, write, writeAndVerify } from './response';
 
 import { HelperService } from '../helper';
 import Homey from 'homey';
@@ -745,8 +745,7 @@ export class Solis extends Homey.Device {
             hasChargeLimit &&
             dischargePower === 0 &&
             chargePower === 0;
-        const isExporting = (gridPortPowerControl === 1 && gridSystemPower > 0 ||
-            gridPortPowerControl === 2 && gridPortPower > 0) &&
+        const isExporting = (gridPortPowerControl === 1 || gridPortPowerControl === 2) &&
             chargeDirection === ForceBatteryChargeDirection.OFF;
         let mode = ForceBatteryChargeMode.UNKNOWN;
 
@@ -1044,14 +1043,18 @@ export class Solis extends Homey.Device {
             } else if (this.chargeMode === ForceBatteryChargeMode.EXPORT) {
                 this.log(`=== EXPORT: writing grid system power=${this.exportPower}W, storage=${forceStorageMode}, grid control=1, passive=OFF`);
                 // EXPORT needs passive mode OFF — disable it first before setting up grid control
-                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.OFF);
-                await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, 0);
-                await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, 0);
-                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.OFF);
-                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
-                await write(this.batteryRegisters.GRID_PORT_POWER.reg as ModbusRegister, client, 0);
-                await write(this.batteryRegisters.GRID_PORT_POWER_CONTROL.reg as ModbusRegister, client, 1);
-                await write(this.batteryRegisters.GRID_SYSTEM_POWER.reg as ModbusRegister, client, this.exportPower);
+                await writeAndVerify(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.OFF);
+                // Settling delay: the inverter takes time to fully exit passive
+                // dispatch logic. Without this, writes to 43132/43133 below are
+                // sometimes silently dropped (read back as 0).
+                await HelperService.delay(500);
+                await writeAndVerify(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, 0);
+                await writeAndVerify(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, 0);
+                await writeAndVerify(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.OFF);
+                await writeAndVerify(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
+                await writeAndVerify(this.batteryRegisters.GRID_PORT_POWER.reg as ModbusRegister, client, 0);
+                await writeAndVerify(this.batteryRegisters.GRID_PORT_POWER_CONTROL.reg as ModbusRegister, client, 1);
+                await writeAndVerify(this.batteryRegisters.GRID_SYSTEM_POWER.reg as ModbusRegister, client, this.exportPower);
             } else {
                 // SELF_USE: disable passive mode, restore normal inverter intelligence
                 await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
