@@ -1089,6 +1089,19 @@ export class Solis extends Homey.Device {
         }
     }
 
+    private logFirmwareVersions(results: Record<string, Measurement>) {
+        // Skip on devices that don't poll the firmware registers (battery driver).
+        if (!results.DSP_VERSION && !results.HMI_VERSION && !results.PROTOCOL_VERSION) {
+            return;
+        }
+        const dsp = results.DSP_VERSION?.computedValue ?? '?';
+        const hmi = results.HMI_VERSION?.computedValue ?? '?';
+        const hmiSub = results.HMI_SUB_VERSION?.computedValue ?? '?';
+        const protocol = results.PROTOCOL_VERSION?.computedValue ?? '?';
+        const model = results.modelName?.computedValue ?? '?';
+        this.log(`=== Firmware: DSP=${dsp} | HMI=${hmi}.${hmiSub} | Protocol=${protocol} | Model=${model}`);
+    }
+
     async handleForceBatteryChargeMode(client: InstanceType<typeof Modbus.client.TCP>, value: string | number) {
         if (typeof value === 'string') {
             this.chargeMode = Number.parseInt(value, 10) as ForceBatteryChargeMode;
@@ -1161,6 +1174,10 @@ export class Solis extends Homey.Device {
                 } catch (error) {
                     this.log(`=== error reading register ${register.reg.addr} - '${(error as Error).message}'`);
                 }
+            }
+
+            if (accumulatedTime % PollRate.PRIO3 === 0) {
+                this.logFirmwareVersions(results);
             }
 
             this.log('= Calculating compound registers...');
