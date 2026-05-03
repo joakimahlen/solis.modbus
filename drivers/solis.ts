@@ -233,6 +233,7 @@ export enum Operation {
     STORAGE_CONTROL,
     OPERATING_MODE,
     ALLOW_GRIDCHARGE,
+    HEX,
 }
 
 export enum PollRate {
@@ -323,6 +324,22 @@ export class Solis extends Homey.Device {
         modelName: {
             reg: { type: MRType.INPUT, addr: 35000, len: 1, dtype: 'UINT16', scale: 0, capability: 'solis_model', operation: Operation.MODEL },
             pollRate: PollRate.PRIO4,
+        },
+        DSP_VERSION: {
+            reg: { type: MRType.INPUT, addr: 33001, len: 1, dtype: 'UINT16', scale: 0, operation: Operation.HEX },
+            pollRate: PollRate.PRIO3,
+        },
+        HMI_VERSION: {
+            reg: { type: MRType.INPUT, addr: 33002, len: 1, dtype: 'UINT16', scale: 0, operation: Operation.HEX },
+            pollRate: PollRate.PRIO3,
+        },
+        PROTOCOL_VERSION: {
+            reg: { type: MRType.INPUT, addr: 33003, len: 1, dtype: 'UINT16', scale: 0, operation: Operation.HEX },
+            pollRate: PollRate.PRIO3,
+        },
+        HMI_SUB_VERSION: {
+            reg: { type: MRType.INPUT, addr: 33069, len: 1, dtype: 'UINT16', scale: 0, operation: Operation.DIRECT },
+            pollRate: PollRate.PRIO3,
         },
         PV1voltage: { reg: { type: MRType.INPUT, addr: 33049, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
         PV1current: { reg: { type: MRType.INPUT, addr: 33050, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
@@ -677,6 +694,9 @@ export class Solis extends Homey.Device {
         const scaledValue = numValue * Math.pow(10, measurement.scale);
 
         switch (operation) {
+            case Operation.HEX:
+                return `0x${numValue.toString(16).padStart(4, '0').toUpperCase()}`;
+
             case Operation.STATUS:
                 return DEVICE_STATUS_DEFINITIONS[numValue] || 'Unknown status code';
 
