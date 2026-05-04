@@ -234,6 +234,7 @@ export enum Operation {
     OPERATING_MODE,
     ALLOW_GRIDCHARGE,
     HEX,
+    STRING,
 }
 
 export enum PollRate {
@@ -340,6 +341,10 @@ export class Solis extends Homey.Device {
         HMI_SUB_VERSION: {
             reg: { type: MRType.INPUT, addr: 33069, len: 1, dtype: 'UINT16', scale: 0, operation: Operation.DIRECT },
             pollRate: PollRate.PRIO3,
+        },
+        SERIAL_NUMBER: {
+            reg: { type: MRType.INPUT, addr: 33004, len: 16, dtype: 'STRING', scale: 0, operation: Operation.STRING },
+            pollRate: PollRate.PRIO4,
         },
         PV1voltage: { reg: { type: MRType.INPUT, addr: 33049, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
         PV1current: { reg: { type: MRType.INPUT, addr: 33050, len: 1, dtype: 'UINT16', scale: -1, operation: Operation.DIRECT }, pollRate: PollRate.PRIO2 },
@@ -696,6 +701,10 @@ export class Solis extends Homey.Device {
         switch (operation) {
             case Operation.HEX:
                 return `0x${numValue.toString(16).padStart(4, '0').toUpperCase()}`;
+
+            case Operation.STRING:
+                // ASCII passthrough — strip nulls and non-printable bytes.
+                return String(measurement.value).replace(/[^\x20-\x7E]/g, '').trim();
 
             case Operation.STATUS:
                 return DEVICE_STATUS_DEFINITIONS[numValue] || 'Unknown status code';
@@ -1099,7 +1108,8 @@ export class Solis extends Homey.Device {
         const hmiSub = results.HMI_SUB_VERSION?.computedValue ?? '?';
         const protocol = results.PROTOCOL_VERSION?.computedValue ?? '?';
         const model = results.modelName?.computedValue ?? '?';
-        this.log(`=== Firmware: DSP=${dsp} | HMI=${hmi}.${hmiSub} | Protocol=${protocol} | Model=${model}`);
+        const serial = results.SERIAL_NUMBER?.computedValue ?? '?';
+        this.log(`=== Firmware: DSP=${dsp} | HMI=${hmi}.${hmiSub} | Protocol=${protocol} | Model=${model} | SN=${serial}`);
     }
 
     async handleForceBatteryChargeMode(client: InstanceType<typeof Modbus.client.TCP>, value: string | number) {
