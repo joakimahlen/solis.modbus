@@ -802,10 +802,19 @@ export class Solis extends Homey.Device {
             this.chargeMode = mode;
         }
 
-        await this.addCapability('force_battery_charge_mode');
+        // NOTE: addCapability re-initializes the capability and removes any
+        // registered capability listener. Calling it every poll cycle (as this
+        // method runs) would strip the listener registered in registerListeners,
+        // causing "Missing Capability Listener" when the user changes the mode.
+        // Only add the capability if it does not already exist.
+        if (!this.hasCapability('force_battery_charge_mode')) {
+            await this.addCapability('force_battery_charge_mode');
+        }
         await this.setCapabilityValue('force_battery_charge_mode', `${mode}`);
 
-        await this.addCapability('force_battery_charge_mode_num');
+        if (!this.hasCapability('force_battery_charge_mode_num')) {
+            await this.addCapability('force_battery_charge_mode_num');
+        }
         await this.setCapabilityValue('force_battery_charge_mode_num', mode);
 
         return mode;
@@ -874,7 +883,13 @@ export class Solis extends Homey.Device {
 
                     if (isCustomRegister) {
                         try {
-                            await this.addCapability(customRegister.capability);
+                            // Guard with hasCapability: addCapability re-initializes the
+                            // capability and removes its listener. registerListeners runs on
+                            // every startPolling (reconnect/settings change), so re-adding
+                            // here would strip the listener registered just below.
+                            if (!this.hasCapability(customRegister.capability)) {
+                                await this.addCapability(customRegister.capability);
+                            }
                             const capabilityValue = await customRegister.getValue(client);
                             if (!isNil(capabilityValue)) {
                                 this.log(`= Custom register capability ${customRegister.capability} initial value:`, capabilityValue, typeof capabilityValue);
@@ -1215,7 +1230,9 @@ export class Solis extends Homey.Device {
                     continue;
                 }
 
-                await this.addCapability(register.reg.capability);
+                if (!this.hasCapability(register.reg.capability)) {
+                    await this.addCapability(register.reg.capability);
+                }
 
                 const values = register.reg.registers.map((regKey) => {
                     const measurement = results[regKey];
@@ -1275,7 +1292,9 @@ export class Solis extends Homey.Device {
                     } as Measurement;
 
                     this.log(`= Read customer register ${key} (${register.reg.capability}) => ${value}`);
-                    await this.addCapability(register.reg.capability);
+                    if (!this.hasCapability(register.reg.capability)) {
+                        await this.addCapability(register.reg.capability);
+                    }
                     await this.setCapabilityValue(register.reg.capability, value);
                 } catch (error) {
                     this.log(`=== error reading custom register ${register.reg.capability} - '${(error as Error).message}'`);

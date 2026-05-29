@@ -601,8 +601,8 @@
               "en": "1000"
             },
             "min": 0,
-            "max": 10000,
-            "step": 200
+            "max": 15000,
+            "step": 250
           },
           {
             "type": "device",
@@ -1177,8 +1177,8 @@
         "en": "W"
       },
       "min": 0,
-      "max": 10000,
-      "step": 200
+      "max": 15000,
+      "step": 250
     },
     "force_battery_discharge_power": {
       "type": "number",

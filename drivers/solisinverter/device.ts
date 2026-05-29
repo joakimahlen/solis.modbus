@@ -27,8 +27,27 @@ export default class SolisInverterDevice extends MySolisBaseDevice {
     };
   }
 
+  /**
+   * Battery-only capabilities that older app versions may have added to the
+   * inverter device via addCapability (Homey persists these in the device
+   * store). The inverter driver neither declares them nor registers listeners
+   * for them, so they show up as dead selectors that throw
+   * "Missing Capability Listener" when tapped. Remove any that linger.
+   */
+  private async removeLeftoverBatteryCapabilities() {
+    const leftover = ['force_battery_charge_mode', 'force_battery_charge_mode_num'];
+    for (const cap of leftover) {
+      if (this.hasCapability(cap)) {
+        this.log(`Removing leftover battery capability from inverter device: ${cap}`);
+        await this.removeCapability(cap).catch((e) => this.error(`Failed removing leftover capability ${cap}:`, e));
+      }
+    }
+  }
+
   async startPolling() {
     this.log('startPolling (solisinverter)');
+
+    await this.removeLeftoverBatteryCapabilities();
 
     const { address, port, unitId } = this.getConnectionSettings();
     this.log(`Connection settings: ${address}:${port} unit ${unitId}`);
