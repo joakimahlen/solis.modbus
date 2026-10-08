@@ -103,7 +103,7 @@ export default class SolisInverterDevice extends MySolisBaseDevice {
         }
         this.log('Connection settings changed, restarting polling');
         this.active = false;
-        this.isPolling = false;
+        this.stopPolling();
         this.connectionHandle?.release();
         this.connectionHandle = undefined;
         setImmediate(() => this.startPolling());
@@ -117,7 +117,7 @@ export default class SolisInverterDevice extends MySolisBaseDevice {
 
     async onDeleted() {
         this.log('SolisInverterDevice has been deleted');
-        this.isPolling = false;
+        this.stopPolling();
         this.active = false;
         this.connectionHandle?.release();
     }

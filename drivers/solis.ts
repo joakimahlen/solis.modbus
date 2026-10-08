@@ -279,11 +279,34 @@ export interface MonitoredRegister<T extends BaseRegister> {
 
 export const IDLE_RECONNECT_TIMEOUT = 120000; // 120 seconds
 export const FORCE_CHARGE_POWER_LIMIT = 15000; // 15 kW
+const CONTROL_REGISTER_KEYS = [
+    'FORCE_CHARGE_SOURCE',
+    'FORCE_CHARGE_LIMIT',
+    'FORCE_CHARGE_POWER',
+    'FORCE_DISCHARGE_POWER',
+    'FORCE_CHARGE_DIRECTION',
+    'STORAGE_CONTROL_MODE',
+    'GRID_PORT_POWER',
+    'GRID_SYSTEM_POWER',
+    'GRID_PORT_POWER_CONTROL',
+];
+
+// The firmware resets 43135 to 0 about five minutes after its last write.
+const DIRECTION_REFRESH_INTERVAL = 4 * 60 * 1000;
+const DIRECTION_MODES = [
+    ForceBatteryChargeMode.CHARGE,
+    ForceBatteryChargeMode.DISCHARGE,
+    ForceBatteryChargeMode.IDLE,
+    ForceBatteryChargeMode.PEAK_SHAVING,
+];
+
+class SupersededError extends Error {}
 
 export class Solis extends Homey.Device {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     homeyLog: any;
     isPolling = false;
+    private pollSession = 0;
     private idleBaseline = 0;
 
     protected hasBatteryControl(): boolean {
@@ -408,11 +431,11 @@ export class Solis extends Homey.Device {
             pollRate: PollRate.PRIO3,
         },
         GRID_IMPORTED_ENERGY_DAILY: {
-            reg: { type: MRType.INPUT, addr: 33171, len: 2, dtype: 'UINT16', scale: -1, capability: 'meter_power.grid_import_daily', operation: Operation.DIRECT },
+            reg: { type: MRType.INPUT, addr: 33171, len: 1, dtype: 'UINT16', scale: -1, capability: 'meter_power.grid_import_daily', operation: Operation.DIRECT },
             pollRate: PollRate.PRIO3,
         },
         GRID_EXPORTED_ENERGY_DAILY: {
-            reg: { type: MRType.INPUT, addr: 33175, len: 2, dtype: 'UINT16', scale: -1, capability: 'meter_power.grid_export_daily', operation: Operation.DIRECT },
+            reg: { type: MRType.INPUT, addr: 33175, len: 1, dtype: 'UINT16', scale: -1, capability: 'meter_power.grid_export_daily', operation: Operation.DIRECT },
             pollRate: PollRate.PRIO3,
         },
         ACCUMULATED_YIELD_ENERGY: {
@@ -426,7 +449,7 @@ export class Solis extends Homey.Device {
     };
 
     batteryRegisters: Record<string, MonitoredRegister<BaseRegister>> = {
-        BATTERY_DIRECTION: { reg: { type: MRType.INPUT, addr: 33135, len: 2, dtype: 'UINT16', scale: 0, operation: Operation.DIRECT }, pollRate: PollRate.PRIO1 },
+        BATTERY_DIRECTION: { reg: { type: MRType.INPUT, addr: 33135, len: 1, dtype: 'UINT16', scale: 0, operation: Operation.DIRECT }, pollRate: PollRate.PRIO1 },
         BATTERY_POWER_RAW: { reg: { type: MRType.INPUT, addr: 33149, len: 2, dtype: 'INT32', scale: 0, operation: Operation.DIRECT }, pollRate: PollRate.PRIO1 },
         BATTERY_POWER: {
             reg: { operation: CompoundOperation.POWER_DIRECTION, registers: ['BATTERY_POWER_RAW', 'BATTERY_DIRECTION'], capability: 'measure_power.batt_power' },
@@ -579,7 +602,7 @@ export class Solis extends Homey.Device {
                     await this.setSetting('force_battery_charge_power', value);
                     if (this.chargeMode === ForceBatteryChargeMode.CHARGE) {
                         this.log(`= Charge power changed to ${value}W, triggering rewrite`);
-                        await this.rewriteChargeModeSetting(client);
+                        this.requestChargeModeApply(client);
                     }
                 },
                 settable: true,
@@ -594,7 +617,7 @@ export class Solis extends Homey.Device {
                     await this.setSetting('force_battery_discharge_power', value);
                     if (this.chargeMode === ForceBatteryChargeMode.DISCHARGE || this.chargeMode === ForceBatteryChargeMode.PEAK_SHAVING) {
                         this.log(`= Discharge power changed to ${value}W, triggering rewrite`);
-                        await this.rewriteChargeModeSetting(client);
+                        this.requestChargeModeApply(client);
                     }
                 },
                 settable: true,
@@ -609,7 +632,7 @@ export class Solis extends Homey.Device {
                     await this.setSetting('force_battery_export_power', value);
                     if (this.chargeMode === ForceBatteryChargeMode.EXPORT) {
                         this.log(`= Export power changed to ${value}W, triggering rewrite`);
-                        await this.rewriteChargeModeSetting(client);
+                        this.requestChargeModeApply(client);
                     }
                 },
                 settable: true,
@@ -817,15 +840,19 @@ export class Solis extends Homey.Device {
         // method runs) would strip the listener registered in registerListeners,
         // causing "Missing Capability Listener" when the user changes the mode.
         // Only add the capability if it does not already exist.
-        if (!this.hasCapability('force_battery_charge_mode')) {
-            await this.addCapability('force_battery_charge_mode');
-        }
-        await this.setCapabilityValue('force_battery_charge_mode', `${mode}`);
+        try {
+            if (!this.hasCapability('force_battery_charge_mode')) {
+                await this.addCapability('force_battery_charge_mode');
+            }
+            await this.setCapabilityValue('force_battery_charge_mode', `${mode}`);
 
-        if (!this.hasCapability('force_battery_charge_mode_num')) {
-            await this.addCapability('force_battery_charge_mode_num');
+            if (!this.hasCapability('force_battery_charge_mode_num')) {
+                await this.addCapability('force_battery_charge_mode_num');
+            }
+            await this.setCapabilityValue('force_battery_charge_mode_num', mode);
+        } catch (error) {
+            this.log('error updating force charge capability!', (error as Error).message);
         }
-        await this.setCapabilityValue('force_battery_charge_mode_num', mode);
 
         return mode;
     }
@@ -917,7 +944,7 @@ export class Solis extends Homey.Device {
                             this.log(`= Setting ${register.capability} to: `, value);
 
                             if (isModbusRegister) {
-                                await write(modbusRegister, client, value);
+                                await this.enqueueControl(() => write(modbusRegister, client, value));
                             } else if (isCustomRegister) {
                                 await customRegister.setValue!(client, value);
                             }
@@ -974,7 +1001,7 @@ export class Solis extends Homey.Device {
                                 // because registerRunListener is global — the last device to register wins.
                                 const targetDevice = (args.device || this) as Solis;
                                 if (isModbusRegister) {
-                                    await write(modbusRegister, client, args.argument_main);
+                                    await targetDevice.enqueueControl(() => write(modbusRegister, client, args.argument_main));
                                 } else if (isCustomRegister) {
                                     // Look up the register from the target device's own register sets
                                     // so the arrow function's captured `this` points to the correct device
@@ -1047,87 +1074,190 @@ export class Solis extends Homey.Device {
         }
     }
 
-    private rewriteQueue: Promise<void> = Promise.resolve();
+    private controlQueue: Promise<void> = Promise.resolve();
+    private queuedApply?: Promise<void>;
+    private desiredGeneration = 0;
+    private lastDirectionWriteAt = 0;
+    private appliedMode?: ForceBatteryChargeMode;
 
-    // Serialized: a listener-triggered rewrite must never interleave its register writes with the poll loop's.
-    private rewriteChargeModeSetting(client: InstanceType<typeof Modbus.client.TCP>): Promise<void> {
-        const run = this.rewriteQueue.then(() => this.applyChargeModeSetting(client));
-        this.rewriteQueue = run.catch(() => undefined);
+    // Every access to the control registers runs here, so a mode snapshot can never be torn by, or predate, a write.
+    private enqueueControl<T>(task: () => Promise<T>): Promise<T> {
+        const run = this.controlQueue.then(task);
+        this.controlQueue = run.then(() => undefined, () => undefined);
         return run;
     }
 
-    private async applyChargeModeSetting(client: InstanceType<typeof Modbus.client.TCP>) {
-        if (isNil(this.chargeMode) || this.chargeMode === ForceBatteryChargeMode.UNKNOWN) {
+    // Returns at once: a mode and its power arrive as separate commands, and must coalesce into one write sequence.
+    private requestChargeModeApply(client: InstanceType<typeof Modbus.client.TCP>) {
+        this.desiredGeneration++;
+        if (this.queuedApply) {
+            return;
+        }
+        this.queuedApply = this.enqueueControl(async () => {
+            this.queuedApply = undefined;
+            await this.applyChargeModeSetting(client);
+        });
+        this.queuedApply.catch((error) => this.error('Queued charge mode apply failed:', error));
+    }
+
+    private async readControlRegisters(client: InstanceType<typeof Modbus.client.TCP>): Promise<Record<string, Measurement> | undefined> {
+        const snapshot: Record<string, Measurement> = {};
+        for (const key of CONTROL_REGISTER_KEYS) {
+            try {
+                snapshot[key] = await this.readRegister(key, this.batteryRegisters[key].reg as ModbusRegister, client);
+            } catch (error) {
+                this.log(`=== error reading control register ${key} - '${(error as Error).message}'`);
+                return undefined;
+            }
+        }
+        const now = new Date();
+        this.lastSuccessfulRead = now;
+        this.idleBaseline = now.getTime();
+        return snapshot;
+    }
+
+    private verifyChargeMode(client: InstanceType<typeof Modbus.client.TCP>, results: Record<string, Measurement>): Promise<void> {
+        return this.enqueueControl(async () => {
+            const snapshot = await this.readControlRegisters(client);
+            if (!snapshot) {
+                this.log('=== Incomplete control register snapshot, skipping mode verification');
+                return;
+            }
+            Object.assign(results, snapshot);
+
+            const detectedMode = await this.updateForceChargeCapability(snapshot);
+
+            // A queued apply will write the newest desired mode; verifying against it now would only duplicate that write.
+            if (this.queuedApply) {
+                return;
+            }
+            if (!isNil(this.chargeMode) && this.chargeMode !== ForceBatteryChargeMode.UNKNOWN && this.chargeMode !== detectedMode) {
+                this.log(`=== Detected ${detectedMode}, rewriting force charge to ${this.chargeMode} ===`);
+                await this.applyChargeModeSetting(client, true);
+                return;
+            }
+
+            const direction = snapshot.FORCE_CHARGE_DIRECTION.computedValue as number;
+            if (DIRECTION_MODES.includes(detectedMode) && Date.now() - this.lastDirectionWriteAt > DIRECTION_REFRESH_INTERVAL) {
+                this.log(`= Refreshing force charge direction ${direction} before the firmware timeout`);
+                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, direction);
+                this.lastDirectionWriteAt = Date.now();
+            }
+        });
+    }
+
+    private async applyChargeModeSetting(client: InstanceType<typeof Modbus.client.TCP>, forceFullSequence = false) {
+        const mode = this.chargeMode;
+        if (isNil(mode) || mode === ForceBatteryChargeMode.UNKNOWN) {
             this.log('= Charge mode is undefined or unknown, skipping rewrite');
             return;
         }
-        this.log(`=== Setting ${ForceBatteryChargeMode[this.chargeMode]} mode`, this.chargeMode, typeof this.chargeMode);
+        // Only a sequence that completed for this mode makes a power-only write safe.
+        const powerOnly = !forceFullSequence && mode === this.appliedMode;
+        this.log(`=== Setting ${ForceBatteryChargeMode[mode]} ${powerOnly ? 'power' : 'mode'}`, mode, typeof mode);
+        this.appliedMode = undefined;
+
+        // A newer command aborts this sequence at the next write; its own sequence rewrites every register.
+        const generation = this.desiredGeneration;
+        const guard = () => {
+            if (generation !== this.desiredGeneration) {
+                throw new SupersededError();
+            }
+        };
+        const directionRegister = this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg;
+        const put = async (register: BaseRegister, value: number) => {
+            guard();
+            await write(register as ModbusRegister, client, value);
+            if (register === directionRegister) this.lastDirectionWriteAt = Date.now();
+        };
+        const putVerified = async (register: BaseRegister, value: number) => {
+            guard();
+            await writeAndVerify(register as ModbusRegister, client, value);
+            if (register === directionRegister) this.lastDirectionWriteAt = Date.now();
+        };
 
         try {
-            await write(this.batteryRegisters.FORCE_CHARGE_LIMIT.reg as ModbusRegister, client, FORCE_CHARGE_POWER_LIMIT);
-            await write(this.batteryRegisters.FORCE_CHARGE_SOURCE.reg as ModbusRegister, client, ForceBatteryChargeSource.GRID_AND_PV);
-
-            // Reset grid power control when not in EXPORT mode
-            if (this.chargeMode !== ForceBatteryChargeMode.EXPORT) {
-                await write(this.batteryRegisters.GRID_PORT_POWER_CONTROL.reg as ModbusRegister, client, 0);
-                await write(this.batteryRegisters.GRID_PORT_POWER.reg as ModbusRegister, client, 0);
-                await write(this.batteryRegisters.GRID_SYSTEM_POWER.reg as ModbusRegister, client, 0);
+            if (powerOnly) {
+                if (mode === ForceBatteryChargeMode.CHARGE) {
+                    await put(this.batteryRegisters.FORCE_CHARGE_POWER.reg, this.chargePower);
+                } else if (mode === ForceBatteryChargeMode.DISCHARGE || mode === ForceBatteryChargeMode.PEAK_SHAVING) {
+                    await put(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg, this.dischargePower);
+                } else if (mode === ForceBatteryChargeMode.EXPORT) {
+                    await putVerified(this.batteryRegisters.GRID_SYSTEM_POWER.reg, this.exportPower);
+                }
+                this.appliedMode = mode;
+                return;
             }
 
-            const forceStorageMode = ForceStorageModes[this.chargeMode];
+            await put(this.batteryRegisters.FORCE_CHARGE_LIMIT.reg, FORCE_CHARGE_POWER_LIMIT);
+            await put(this.batteryRegisters.FORCE_CHARGE_SOURCE.reg, ForceBatteryChargeSource.GRID_AND_PV);
+
+            // Reset grid power control when not in EXPORT mode
+            if (mode !== ForceBatteryChargeMode.EXPORT) {
+                await put(this.batteryRegisters.GRID_PORT_POWER_CONTROL.reg, 0);
+                await put(this.batteryRegisters.GRID_PORT_POWER.reg, 0);
+                await put(this.batteryRegisters.GRID_SYSTEM_POWER.reg, 0);
+            }
+
+            const forceStorageMode = ForceStorageModes[mode];
 
             // Write order: set parameters (power, direction) first, then storage control mode,
             // then passive mode last. This prevents brief unintended states where the inverter
             // enters passive mode before knowing what charge/discharge behavior to follow.
-            if (this.chargeMode === ForceBatteryChargeMode.CHARGE) {
-                await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, this.chargePower);
-                await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, 0);
-                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.CHARGE);
-                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
-                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.ON);
-            } else if (this.chargeMode === ForceBatteryChargeMode.DISCHARGE) {
-                await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, 0);
-                await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, this.dischargePower);
-                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.DISCHARGE);
-                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
-                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.ON);
-            } else if (this.chargeMode === ForceBatteryChargeMode.IDLE) {
-                await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, 0);
-                await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, 0);
-                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.CHARGE);
-                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
-                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.ON);
-            } else if (this.chargeMode === ForceBatteryChargeMode.PEAK_SHAVING) {
-                await write(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, 0);
-                await write(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, this.dischargePower);
-                await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.DISCHARGE);
-                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
-                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.ON);
-            } else if (this.chargeMode === ForceBatteryChargeMode.EXPORT) {
+            if (mode === ForceBatteryChargeMode.CHARGE) {
+                await put(this.batteryRegisters.FORCE_CHARGE_POWER.reg, this.chargePower);
+                await put(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg, 0);
+                await put(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg, ForceBatteryChargeDirection.CHARGE);
+                await put(this.batteryRegisters.STORAGE_CONTROL_MODE.reg, forceStorageMode);
+                await put(this.inverterRegisters.PASSIVE_MODE.reg, PassiveMode.ON);
+            } else if (mode === ForceBatteryChargeMode.DISCHARGE) {
+                await put(this.batteryRegisters.FORCE_CHARGE_POWER.reg, 0);
+                await put(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg, this.dischargePower);
+                await put(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg, ForceBatteryChargeDirection.DISCHARGE);
+                await put(this.batteryRegisters.STORAGE_CONTROL_MODE.reg, forceStorageMode);
+                await put(this.inverterRegisters.PASSIVE_MODE.reg, PassiveMode.ON);
+            } else if (mode === ForceBatteryChargeMode.IDLE) {
+                await put(this.batteryRegisters.FORCE_CHARGE_POWER.reg, 0);
+                await put(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg, 0);
+                await put(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg, ForceBatteryChargeDirection.CHARGE);
+                await put(this.batteryRegisters.STORAGE_CONTROL_MODE.reg, forceStorageMode);
+                await put(this.inverterRegisters.PASSIVE_MODE.reg, PassiveMode.ON);
+            } else if (mode === ForceBatteryChargeMode.PEAK_SHAVING) {
+                await put(this.batteryRegisters.FORCE_CHARGE_POWER.reg, 0);
+                await put(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg, this.dischargePower);
+                await put(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg, ForceBatteryChargeDirection.DISCHARGE);
+                await put(this.batteryRegisters.STORAGE_CONTROL_MODE.reg, forceStorageMode);
+                await put(this.inverterRegisters.PASSIVE_MODE.reg, PassiveMode.ON);
+            } else if (mode === ForceBatteryChargeMode.EXPORT) {
                 this.log(`=== EXPORT: writing grid system power=${this.exportPower}W, storage=${forceStorageMode}, grid control=1, passive=OFF`);
                 // EXPORT needs passive mode OFF — disable it first before setting up grid control
-                await writeAndVerify(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.OFF);
+                await putVerified(this.inverterRegisters.PASSIVE_MODE.reg, PassiveMode.OFF);
                 // Settling delay: the inverter takes time to fully exit passive
                 // dispatch logic. Without this, writes to 43132/43133 below are
                 // sometimes silently dropped (read back as 0).
                 await HelperService.delay(500);
-                await writeAndVerify(this.batteryRegisters.FORCE_CHARGE_POWER.reg as ModbusRegister, client, 0);
-                await writeAndVerify(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg as ModbusRegister, client, 0);
-                await writeAndVerify(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, ForceBatteryChargeDirection.OFF);
-                await writeAndVerify(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
-                await writeAndVerify(this.batteryRegisters.GRID_PORT_POWER.reg as ModbusRegister, client, 0);
-                await writeAndVerify(this.batteryRegisters.GRID_PORT_POWER_CONTROL.reg as ModbusRegister, client, 1);
-                await writeAndVerify(this.batteryRegisters.GRID_SYSTEM_POWER.reg as ModbusRegister, client, this.exportPower);
+                await putVerified(this.batteryRegisters.FORCE_CHARGE_POWER.reg, 0);
+                await putVerified(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg, 0);
+                await putVerified(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg, ForceBatteryChargeDirection.OFF);
+                await putVerified(this.batteryRegisters.STORAGE_CONTROL_MODE.reg, forceStorageMode);
+                await putVerified(this.batteryRegisters.GRID_PORT_POWER.reg, 0);
+                await putVerified(this.batteryRegisters.GRID_PORT_POWER_CONTROL.reg, 1);
+                await putVerified(this.batteryRegisters.GRID_SYSTEM_POWER.reg, this.exportPower);
             } else {
                 // SELF_USE: disable passive mode, restore normal inverter intelligence
-                await write(this.batteryRegisters.STORAGE_CONTROL_MODE.reg as ModbusRegister, client, forceStorageMode);
-                await write(this.inverterRegisters.PASSIVE_MODE.reg as ModbusRegister, client, PassiveMode.OFF);
+                await put(this.batteryRegisters.STORAGE_CONTROL_MODE.reg, forceStorageMode);
+                await put(this.inverterRegisters.PASSIVE_MODE.reg, PassiveMode.OFF);
             }
+            this.appliedMode = mode;
 
             // Don't read back or update force_battery_charge_mode capability here.
             // The main poll loop detection (executePoll) is the sole source for the capability value,
             // so condition cards reflect the actual inverter state, not the transient post-rewrite state.
         } catch (error) {
+            if (error instanceof SupersededError) {
+                this.log(`=== ${ForceBatteryChargeMode[mode]} sequence superseded by a newer command`);
+                return;
+            }
             this.error('Error updating force battery charge mode:', error);
         }
     }
@@ -1153,7 +1283,7 @@ export class Solis extends Homey.Device {
             this.chargeMode = value as ForceBatteryChargeMode;
         }
         this.log(`= Setting force battery mode to: ${ForceBatteryChargeMode[this.chargeMode]}`);
-        await this.rewriteChargeModeSetting(client);
+        this.requestChargeModeApply(client);
     }
 
     async poll(client: InstanceType<typeof Modbus.client.TCP>, registers: Record<string, MonitoredRegister<BaseRegister>>, active: () => boolean) {
@@ -1162,12 +1292,21 @@ export class Solis extends Homey.Device {
             return;
         }
 
+        const session = ++this.pollSession;
         this.isPolling = true;
         try {
-            await this.executePoll(client, registers, active);
+            await this.executePoll(client, registers, () => active() && session === this.pollSession);
         } finally {
-            this.isPolling = false;
+            if (session === this.pollSession) {
+                this.isPolling = false;
+            }
         }
+    }
+
+    // Ends the running poll loop at its next iteration, and lets a new one start at once.
+    protected stopPolling() {
+        this.pollSession++;
+        this.isPolling = false;
     }
 
     private async executePoll(client: InstanceType<typeof Modbus.client.TCP>, registers: Record<string, MonitoredRegister<BaseRegister>>, active: () => boolean) {
@@ -1201,6 +1340,11 @@ export class Solis extends Homey.Device {
                 const register = registers[key] as MonitoredRegister<ModbusRegister>;
 
                 if (!register.reg.addr) {
+                    continue;
+                }
+
+                // Read every cycle inside verifyChargeMode, as one snapshot.
+                if (this.hasBatteryControl() && CONTROL_REGISTER_KEYS.includes(key)) {
                     continue;
                 }
 
@@ -1259,13 +1403,13 @@ export class Solis extends Homey.Device {
                     return measurement.computedValue as number;
                 });
 
-                let compoundValue = 0;
+                let compoundValue: number;
                 if (register.reg.operation === 'multiply') {
                     compoundValue = reduce(values, multiply, 1.0);
                     this.log(`= Calculated multiply for ${register.reg.registers.join(' * ')} = ${values.join(' * ')} = ${compoundValue}`);
                 } else if (register.reg.operation === 'add') {
-                    this.log(`= Calculated add for ${register.reg.registers.join(' + ')} = ${values.join(' + ')} = ${compoundValue}`);
                     compoundValue = sum(values);
+                    this.log(`= Calculated add for ${register.reg.registers.join(' + ')} = ${values.join(' + ')} = ${compoundValue}`);
                 } else if (register.reg.operation === 'power_direction') {
                     // Homey convention: positive = charging (consuming), negative = discharging (delivering)
                     const [rawPower, direction] = values;
@@ -1321,20 +1465,10 @@ export class Solis extends Homey.Device {
             }
 
             if (this.hasBatteryControl()) {
-                let detectedMode = ForceBatteryChargeMode.UNKNOWN;
                 try {
-                    detectedMode = await this.updateForceChargeCapability(results);
+                    await this.verifyChargeMode(client, results);
                 } catch (error) {
-                    this.log('error updating force charge capability!', (error as Error).message);
-                }
-
-                try {
-                    if (!isNil(this.chargeMode) && this.chargeMode !== ForceBatteryChargeMode.UNKNOWN && this.chargeMode !== detectedMode) {
-                        this.log(`=== Detected ${detectedMode}, rewriting force charge to ${this.chargeMode} ===`);
-                        await this.rewriteChargeModeSetting(client);
-                    }
-                } catch (error) {
-                    this.log('error rewriting charge mode setting!', (error as Error).message);
+                    this.log('error verifying charge mode!', (error as Error).message);
                 }
             }
 

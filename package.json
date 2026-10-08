@@ -1,5 +1,5 @@
 {
-  "name": "solaredge.modbus",
+  "name": "solis.modbus",
   "version": "1.0.1",
   "main": "app.ts",
   "engines": {

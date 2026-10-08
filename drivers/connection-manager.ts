@@ -13,6 +13,8 @@ interface ManagedConnection {
     refCount: number;
     connectionOptions: net.SocketConnectOpts;
     connectCallbacks: Array<() => void>;
+    destroyed: boolean;
+    reconnectTimer?: NodeJS.Timeout;
 }
 
 const connections = new Map<string, ManagedConnection>();
@@ -22,6 +24,10 @@ function getKey(address: string, port: number, unitId: number): string {
 }
 
 function connectSocket(conn: ManagedConnection, log: (...args: unknown[]) => void) {
+    conn.reconnectTimer = undefined;
+    if (conn.destroyed) {
+        return;
+    }
     conn.socket.setKeepAlive(true);
     log('=== Shared connection connecting...', conn.connectionOptions);
     conn.socket.connect(conn.connectionOptions);
@@ -44,7 +50,7 @@ export function acquireConnection(
         const client = new Modbus.client.TCP(socket, unitId, 5000);
         const connectionOptions: net.SocketConnectOpts = { host: address, port, keepAlive: true };
 
-        conn = { socket, client, refCount: 1, connectionOptions, connectCallbacks: [] };
+        conn = { socket, client, refCount: 1, connectionOptions, connectCallbacks: [], destroyed: false };
         connections.set(key, conn);
 
         socket.on('connect', () => {
@@ -55,8 +61,12 @@ export function acquireConnection(
         });
 
         socket.on('close', () => {
+            if (conn!.destroyed) {
+                log(`=== Shared connection [${key}] closed after release`);
+                return;
+            }
             log(`=== Shared connection [${key}] closed. Reconnecting in 5s...`);
-            setTimeout(() => connectSocket(conn!, log), 5000);
+            conn!.reconnectTimer = setTimeout(() => connectSocket(conn!, log), 5000);
         });
 
         socket.on('timeout', () => {
@@ -76,11 +86,14 @@ export function acquireConnection(
     }
 
     const capturedConn = conn;
+    const ownCallbacks: Array<() => void> = [];
+    let released = false;
 
     return {
         client: capturedConn.client,
 
         onConnect(callback: () => void) {
+            ownCallbacks.push(callback);
             capturedConn.connectCallbacks.push(callback);
             // If already connected, fire immediately
             if (capturedConn.socket.readyState === 'open') {
@@ -89,9 +102,16 @@ export function acquireConnection(
         },
 
         release() {
+            if (released) {
+                return;
+            }
+            released = true;
+            capturedConn.connectCallbacks = capturedConn.connectCallbacks.filter((cb) => !ownCallbacks.includes(cb));
             capturedConn.refCount--;
             log(`=== Released shared connection [${key}] (refCount: ${capturedConn.refCount})`);
             if (capturedConn.refCount <= 0) {
+                capturedConn.destroyed = true;
+                clearTimeout(capturedConn.reconnectTimer);
                 capturedConn.socket.destroy();
                 connections.delete(key);
                 log(`=== Destroyed shared connection [${key}]`);
