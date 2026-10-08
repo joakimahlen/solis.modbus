@@ -9,9 +9,6 @@ import { HelperService } from '../helper';
 import Homey from 'homey';
 import { Measurement } from './measurement';
 
-/* eslint-disable @typescript-eslint/no-misused-promises */
-/* eslint-disable indent */
-
 export enum ForceBatteryChargeMode {
     UNKNOWN = -1,
     SELF_USE = 0,
@@ -578,7 +575,13 @@ export class Solis extends Homey.Device {
             reg: {
                 capability: 'force_battery_charge_power',
                 getValue: (client) => this.getSetting('force_battery_charge_power'),
-                setValue: (client, value) => this.setSetting('force_battery_charge_power', value),
+                setValue: async (client, value) => {
+                    await this.setSetting('force_battery_charge_power', value);
+                    if (this.chargeMode === ForceBatteryChargeMode.CHARGE) {
+                        this.log(`= Charge power changed to ${value}W, triggering rewrite`);
+                        await this.rewriteChargeModeSetting(client);
+                    }
+                },
                 settable: true,
             },
             pollRate: PollRate.PRIO2,
@@ -587,7 +590,13 @@ export class Solis extends Homey.Device {
             reg: {
                 capability: 'force_battery_discharge_power',
                 getValue: (client) => this.getSetting('force_battery_discharge_power'),
-                setValue: (client, value) => this.setSetting('force_battery_discharge_power', value),
+                setValue: async (client, value) => {
+                    await this.setSetting('force_battery_discharge_power', value);
+                    if (this.chargeMode === ForceBatteryChargeMode.DISCHARGE || this.chargeMode === ForceBatteryChargeMode.PEAK_SHAVING) {
+                        this.log(`= Discharge power changed to ${value}W, triggering rewrite`);
+                        await this.rewriteChargeModeSetting(client);
+                    }
+                },
                 settable: true,
             },
             pollRate: PollRate.PRIO2,
@@ -597,7 +606,7 @@ export class Solis extends Homey.Device {
                 capability: 'force_battery_export_power',
                 getValue: (client) => this.getSetting('force_battery_export_power'),
                 setValue: async (client, value) => {
-                    this.setSetting('force_battery_export_power', value);
+                    await this.setSetting('force_battery_export_power', value);
                     if (this.chargeMode === ForceBatteryChargeMode.EXPORT) {
                         this.log(`= Export power changed to ${value}W, triggering rewrite`);
                         await this.rewriteChargeModeSetting(client);
@@ -684,9 +693,9 @@ export class Solis extends Homey.Device {
         this.setSettings({ last_successful_read: date });
     }
 
-    private setSetting(setting: string, value: string | number) {
+    private async setSetting(setting: string, value: string | number) {
         console.log('= Storing', setting, value);
-        this.setSettings({ [setting]: value });
+        await this.setSettings({ [setting]: value });
     }
 
     static applyOperation(measurement: Measurement, operation: Operation): number | string {
@@ -778,7 +787,8 @@ export class Solis extends Homey.Device {
             chargeDirection === ForceBatteryChargeDirection.OFF;
         let mode = ForceBatteryChargeMode.UNKNOWN;
 
-        this.log(`=== Detection: src=${chargeSource} dir=${chargeDirection} chgPwr=${chargePower} disPwr=${dischargePower} limit=${chargeLimit} storage=${storageControlMode} gridCtrl=${gridPortPowerControl} gridPort=${gridPortPower} gridSys=${gridSystemPower} isChg=${isCharging} isDis=${isDischarging} isIdle=${isIdle} isExp=${isExporting}`);
+        this.log(`=== Detection: src=${chargeSource} dir=${chargeDirection} chgPwr=${chargePower} disPwr=${dischargePower} limit=${chargeLimit} storage=${storageControlMode} ` +
+            `gridCtrl=${gridPortPowerControl} gridPort=${gridPortPower} gridSys=${gridSystemPower} isChg=${isCharging} isDis=${isDischarging} isIdle=${isIdle} isExp=${isExporting}`);
 
         if (isCharging && storageControlMode === ForceStorageModes[ForceBatteryChargeMode.CHARGE]) {
             mode = ForceBatteryChargeMode.CHARGE;
@@ -1037,7 +1047,16 @@ export class Solis extends Homey.Device {
         }
     }
 
-    private async rewriteChargeModeSetting(client: InstanceType<typeof Modbus.client.TCP>) {
+    private rewriteQueue: Promise<void> = Promise.resolve();
+
+    // Serialized: a listener-triggered rewrite must never interleave its register writes with the poll loop's.
+    private rewriteChargeModeSetting(client: InstanceType<typeof Modbus.client.TCP>): Promise<void> {
+        const run = this.rewriteQueue.then(() => this.applyChargeModeSetting(client));
+        this.rewriteQueue = run.catch(() => undefined);
+        return run;
+    }
+
+    private async applyChargeModeSetting(client: InstanceType<typeof Modbus.client.TCP>) {
         if (isNil(this.chargeMode) || this.chargeMode === ForceBatteryChargeMode.UNKNOWN) {
             this.log('= Charge mode is undefined or unknown, skipping rewrite');
             return;
