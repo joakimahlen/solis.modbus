@@ -293,12 +293,11 @@ const CONTROL_REGISTER_KEYS = [
 
 // The firmware resets 43135 to 0 about five minutes after its last write.
 const DIRECTION_REFRESH_INTERVAL = 4 * 60 * 1000;
-const DIRECTION_MODES = [
-    ForceBatteryChargeMode.CHARGE,
-    ForceBatteryChargeMode.DISCHARGE,
-    ForceBatteryChargeMode.IDLE,
-    ForceBatteryChargeMode.PEAK_SHAVING,
-];
+const DIRECTION_BY_MODE: Partial<Record<ForceBatteryChargeMode, ForceBatteryChargeDirection>> = {
+    [ForceBatteryChargeMode.CHARGE]: ForceBatteryChargeDirection.CHARGE,
+    [ForceBatteryChargeMode.DISCHARGE]: ForceBatteryChargeDirection.DISCHARGE,
+    [ForceBatteryChargeMode.IDLE]: ForceBatteryChargeDirection.CHARGE,
+};
 
 class SupersededError extends Error {}
 
@@ -615,7 +614,7 @@ export class Solis extends Homey.Device {
                 getValue: (client) => this.getSetting('force_battery_discharge_power'),
                 setValue: async (client, value) => {
                     await this.setSetting('force_battery_discharge_power', value);
-                    if (this.chargeMode === ForceBatteryChargeMode.DISCHARGE || this.chargeMode === ForceBatteryChargeMode.PEAK_SHAVING) {
+                    if (this.chargeMode === ForceBatteryChargeMode.DISCHARGE) {
                         this.log(`= Discharge power changed to ${value}W, triggering rewrite`);
                         this.requestChargeModeApply(client);
                     }
@@ -1137,9 +1136,10 @@ export class Solis extends Homey.Device {
                 return;
             }
 
-            const direction = snapshot.FORCE_CHARGE_DIRECTION.computedValue as number;
-            if (DIRECTION_MODES.includes(detectedMode) && Date.now() - this.lastDirectionWriteAt > DIRECTION_REFRESH_INTERVAL) {
-                this.log(`= Refreshing force charge direction ${direction} before the firmware timeout`);
+            const direction = DIRECTION_BY_MODE[detectedMode];
+            if (direction !== undefined && Date.now() - this.lastDirectionWriteAt > DIRECTION_REFRESH_INTERVAL) {
+                const current = snapshot.FORCE_CHARGE_DIRECTION.computedValue as number;
+                this.log(`= Refreshing force charge direction ${current} -> ${direction} before the firmware timeout`);
                 await write(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg as ModbusRegister, client, direction);
                 this.lastDirectionWriteAt = Date.now();
             }
@@ -1150,6 +1150,11 @@ export class Solis extends Homey.Device {
         const mode = this.chargeMode;
         if (isNil(mode) || mode === ForceBatteryChargeMode.UNKNOWN) {
             this.log('= Charge mode is undefined or unknown, skipping rewrite');
+            return;
+        }
+        // Forced discharge at 0 W holds the battery idle, so a missing power must not be written as 0.
+        if (mode === ForceBatteryChargeMode.DISCHARGE && isNil(this.dischargePower)) {
+            this.error('= DISCHARGE has no discharge power set (no Flow sends force_battery_discharge_power), not applying');
             return;
         }
         // Only a sequence that completed for this mode makes a power-only write safe.
@@ -1180,7 +1185,7 @@ export class Solis extends Homey.Device {
             if (powerOnly) {
                 if (mode === ForceBatteryChargeMode.CHARGE) {
                     await put(this.batteryRegisters.FORCE_CHARGE_POWER.reg, this.chargePower);
-                } else if (mode === ForceBatteryChargeMode.DISCHARGE || mode === ForceBatteryChargeMode.PEAK_SHAVING) {
+                } else if (mode === ForceBatteryChargeMode.DISCHARGE) {
                     await put(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg, this.dischargePower);
                 } else if (mode === ForceBatteryChargeMode.EXPORT) {
                     await putVerified(this.batteryRegisters.GRID_SYSTEM_POWER.reg, this.exportPower);
@@ -1223,9 +1228,10 @@ export class Solis extends Homey.Device {
                 await put(this.batteryRegisters.STORAGE_CONTROL_MODE.reg, forceStorageMode);
                 await put(this.inverterRegisters.PASSIVE_MODE.reg, PassiveMode.ON);
             } else if (mode === ForceBatteryChargeMode.PEAK_SHAVING) {
+                // Direction OFF hands control to the inverter's own peak shaving; DISCHARGE with 0 W holds the battery idle.
                 await put(this.batteryRegisters.FORCE_CHARGE_POWER.reg, 0);
-                await put(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg, this.dischargePower);
-                await put(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg, ForceBatteryChargeDirection.DISCHARGE);
+                await put(this.batteryRegisters.FORCE_DISCHARGE_POWER.reg, 0);
+                await put(this.batteryRegisters.FORCE_CHARGE_DIRECTION.reg, ForceBatteryChargeDirection.OFF);
                 await put(this.batteryRegisters.STORAGE_CONTROL_MODE.reg, forceStorageMode);
                 await put(this.inverterRegisters.PASSIVE_MODE.reg, PassiveMode.ON);
             } else if (mode === ForceBatteryChargeMode.EXPORT) {
