@@ -48,15 +48,21 @@ The mechanism works as follows:
 
 2. **Detected mode** (return value of `updateForceChargeCapability`): Determined each poll cycle by reading register values and matching them against known mode patterns. Shown in the UI capability but **must never overwrite** the desired mode (except on initial startup when no desired mode exists yet).
 
-3. **Rewrite check** (in `executePoll`): Each poll cycle, if the detected mode differs from the desired mode, `rewriteChargeModeSetting` rewrites all registers to enforce the desired mode.
+3. **Rewrite check** (in `enforce`, called by `lib/poller.ts`): Each poll cycle, if the detected mode differs from the desired mode, `rewriteChargeModeSetting` rewrites all registers to enforce the desired mode.
 
 **Invariant that must never be violated:** `updateForceChargeCapability` must NOT overwrite `this.chargeMode` with UNKNOWN or with any detected mode when a valid desired mode is already stored. Doing so destroys the desired mode and disables the rewrite mechanism entirely, leaving the inverter free to do whatever it wants.
 
-Key methods:
-- `updateForceChargeCapability()` — Detects current mode from registers. Only sets `this.chargeMode` on initial startup (when no stored mode exists).
-- `rewriteChargeModeSetting()` — Writes all registers for the desired mode. Called when detected != desired.
-- `handleForceBatteryChargeMode()` — Entry point for user-initiated mode changes. Sets `this.chargeMode` and triggers rewrite.
-- `executePoll()` — Orchestrates detection and rewrite each cycle.
+The protocol (register map, mode detection, write sequences) lives in `@digistrada/inverter-modbus`
+(`ModbusInverter` base + `SolisInverter`); its CLAUDE.md states the invariants and its tests guard them.
+Change it there, not here. The package opens no sockets and runs no timers, so this app owns them:
+`lib/modbus-client.ts` shares one socket per host:port, `lib/poller.ts` runs the 10 s poll loop (due
+registers, then `enforce`), and `drivers/solis.ts` maps values to capabilities, keeps the desired mode and
+per-mode powers in device settings, and wires capability listeners and flow cards. There is no watchdog.
+
+### Read-only mode
+
+Each device has the setting **"Controlled by external EMS (read-only)"** (`external_ems_readonly`, default off).
+When on, the app reads and detects the mode but never writes: commands are rejected and there is no rewrite.
 
 ## CRITICAL: app.json is Auto-Generated — Never Edit It Directly
 
@@ -77,18 +83,20 @@ The `id` field inside a flow card JSON must match the filename (without `.json`)
 ## Project Structure
 
 ```
+lib/
+  modbus-client.ts   # Shared jsmodbus socket per host:port, serialized requests, reconnect
+  poller.ts          # 10 s poll loop: due registers, then mode enforcement
 drivers/
-  solis.ts           # Core Solis class with all register definitions and mode logic
-  basedevice.ts      # Abstract base with Modbus TCP connection management
-  response.ts        # Modbus read/write helpers
+  solis.ts           # Homey adapter over SolisInverter from @digistrada/inverter-modbus
   solisinverter/     # Inverter-only driver (no battery)
-  solisbattery/      # Battery-only driver
+  solisbattery/      # Battery-only driver (controls the mode)
 ```
 
 ## Key Files
 
-- [solis.ts](drivers/solis.ts) - Contains `ForceBatteryChargeMode` enum, register definitions, and `rewriteChargeModeSetting()` which implements the mode logic
-- [basedevice.ts](drivers/basedevice.ts) - Modbus TCP socket management and polling loop
+- [solis.ts](drivers/solis.ts) - Homey adapter: capabilities, settings-backed desired mode, flow cards
+- [poller.ts](lib/poller.ts) / [modbus-client.ts](lib/modbus-client.ts) - poll loop and shared connection
+- `@digistrada/inverter-modbus` - register definitions, `ForceBatteryChargeMode` and the mode logic
 - [app.json](app.json) - Capability definitions and Homey flow configurations
 
 ## Documentation

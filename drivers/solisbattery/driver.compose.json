@@ -140,6 +140,19 @@
           "max": 50
         }
       ]
+    },
+    {
+      "type": "group",
+      "label": { "en": "Control" },
+      "children": [
+        {
+          "id": "external_ems_readonly",
+          "type": "checkbox",
+          "label": { "en": "Controlled by external EMS (read-only)" },
+          "hint": { "en": "Turn on when another energy management system controls this inverter over Modbus. The app then only reads values: it writes no registers, rejects mode and power commands, and does not rewrite the battery mode when the inverter changes it." },
+          "value": false
+        }
+      ]
     }
   ]
 }
