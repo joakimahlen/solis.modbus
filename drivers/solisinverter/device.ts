@@ -13,6 +13,11 @@ export default class SolisInverterDevice extends Solis {
         };
     }
 
+    /** The inverter's core live telemetry, both polled every PRIO1 cycle. */
+    protected criticalKeys(): readonly string[] {
+        return ['ACTIVE_POWER', 'PV_POWER'];
+    }
+
     protected startDelayMs(): number {
         return 2500;
     }

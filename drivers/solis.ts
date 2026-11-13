@@ -50,7 +50,21 @@ export abstract class Solis extends Homey.Device {
     private poller?: Poller;
     private desired: ModeCommand<SolisMode> | null = null;
 
+    /** The device is marked unavailable once any critical register has gone this long without a fresh read. */
+    private static readonly STALE_AFTER_MS = 5 * 60 * 1000;
+    /** Last time each value key was read; seeded at startup so the grace period runs from boot. */
+    private readonly lastSeen = new Map<string, number>();
+    private markedUnavailable = false;
+
     protected abstract readonly scope: SolisScope;
+
+    /**
+     * The register keys whose freshness defines availability: the decision-critical ones only.
+     * The device goes unavailable if ANY of these goes stale, so partial failures are caught, while
+     * cosmetic registers (PV strings, daily counters) never trigger a false alarm. Every listed key
+     * must be polled well within STALE_AFTER_MS, or the device would flap.
+     */
+    protected abstract criticalKeys(): readonly string[];
 
     /** Register or derived key → capability, where this device differs from the register's default. */
     protected capabilityOverrides(): Record<string, string> {
@@ -123,6 +137,9 @@ export abstract class Solis extends Homey.Device {
             return;
         }
         await this.setAvailable();
+        this.markedUnavailable = false;
+        const now = Date.now();
+        for (const key of this.criticalKeys()) this.lastSeen.set(key, now);
         await this.onStarted();
 
         const logger = { log: this.log.bind(this), error: this.error.bind(this) };
@@ -135,6 +152,7 @@ export abstract class Solis extends Homey.Device {
             onAdopt: (command) => this.storeDesired(command).catch((e) => this.error('Storing detected mode failed:', e)),
             onModeDetected: (mode) => this.onModeDetected(mode).catch((e) => this.error('error updating force charge capability!', e)),
             onValues: (values, elapsed) => this.onValues(values, elapsed).catch((e) => this.error('Error updating capabilities:', e)),
+            onPollComplete: () => this.refreshAvailability().catch((e) => this.error('Availability check failed:', e)),
         }, logger);
 
         await this.registerListeners();
@@ -197,7 +215,9 @@ export abstract class Solis extends Homey.Device {
     }
 
     private async onValues(values: PollValues, elapsedSeconds: number) {
+        const readAt = Date.now();
         for (const [key, value] of Object.entries(values)) {
+            this.lastSeen.set(key, readAt);
             const capability = this.capabilityOf(key);
             this.log(`= Read ${key} (${capability}) => ${value}`);
             if (!capability) {
@@ -220,6 +240,26 @@ export abstract class Solis extends Homey.Device {
                 await this.ensureCapability('last_successful_read');
                 await this.setCapabilityValue('last_successful_read', lastRead.toISOString());
             }
+        }
+    }
+
+    /**
+     * Runs after every poll tick (success or failure). Marks the device unavailable when any critical
+     * register has gone stale, and available again as soon as it reads fresh. Driven by the poll loop
+     * rather than a separate timer, so there is nothing extra to tear down.
+     */
+    private async refreshAvailability(): Promise<void> {
+        const now = Date.now();
+        const stale = this.criticalKeys().find((key) => now - (this.lastSeen.get(key) ?? now) > Solis.STALE_AFTER_MS);
+        if (stale && !this.markedUnavailable) {
+            this.markedUnavailable = true;
+            const agoSec = Math.round((now - (this.lastSeen.get(stale) ?? now)) / 1000);
+            this.log(`=== No fresh read of ${stale} for ${agoSec}s, marking device unavailable`);
+            await this.setUnavailable('No response from the inverter');
+        } else if (!stale && this.markedUnavailable) {
+            this.markedUnavailable = false;
+            this.log('=== Fresh reads resumed, marking device available');
+            await this.setAvailable();
         }
     }
 

@@ -9,6 +9,8 @@ export interface PollerHooks {
     onAdopt(command: ModeCommand<SolisMode>): Promise<void>;
     onModeDetected(mode: DetectedMode<SolisMode>): Promise<void>;
     onValues(values: PollValues, elapsedSeconds: number): Promise<void>;
+    /** Called once after every poll tick, whether it succeeded, failed, or was skipped (offline). */
+    onPollComplete(): void;
 }
 
 /** Polls one device every PRIO1 seconds: due registers, then mode enforcement when it controls the battery. */
@@ -37,7 +39,9 @@ export class Poller {
     private async loop(): Promise<void> {
         if (this.stopped) return;
         await this.tick().catch((e) => this.logger.error('Poll failed:', e));
-        if (!this.stopped) this.timer = setTimeout(() => this.loop(), PollRate.PRIO1 * 1000);
+        if (this.stopped) return;
+        this.hooks.onPollComplete();
+        this.timer = setTimeout(() => this.loop(), PollRate.PRIO1 * 1000);
     }
 
     private async tick(): Promise<void> {

@@ -1,10 +1,9 @@
 import Homey from 'homey';
-// @ts-expect-error - homey-log-to-file has no types
-import LogToFile from 'homey-log-to-file';
+import { logToFile } from './lib/log-to-file';
 
 class MySolisApp extends Homey.App {
     async onInit() {
-        await LogToFile();
+        logToFile();
         this.log('MySolisApp has been initialized');
     }
 }
