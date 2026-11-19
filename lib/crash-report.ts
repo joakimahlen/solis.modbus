@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import * as v8 from 'node:v8';
 import type Homey from 'homey';
 
 const CRASH_FILE = '/userdata/last-crash.txt';
@@ -6,6 +7,8 @@ const RUNNING_FILE = '/userdata/running';
 const MEMORY_LOG_INTERVAL_MS = 10 * 60 * 1000;
 /** A crash loop must not flood the timeline. */
 const MIN_NOTIFICATION_INTERVAL_MS = 60 * 60 * 1000;
+
+const mb = (bytes: number): string => (bytes / 1024 / 1024).toFixed(1);
 
 /**
  * Records why the previous run ended and reports it on the next start:
@@ -51,23 +54,51 @@ export function setupCrashReport(app: Homey.App): void {
 
     if (crash) {
         app.error(`=== Previous run crashed: ${crash}`);
-        const lastNotified = Number(app.homey.settings.get('lastCrashNotification')) || 0;
-        if (Date.now() - lastNotified >= MIN_NOTIFICATION_INTERVAL_MS) {
-            app.homey.settings.set('lastCrashNotification', Date.now());
-            const firstLine = crash.split('\n')[0].replace(/^\S+ /, ''); // drop the timestamp
-            app.homey.notifications
-                .createNotification({ excerpt: `Solis Modbus crashed and was restarted: ${firstLine}`.slice(0, 300) })
-                .catch((err: unknown) => app.error('=== Could not post crash notification', err));
+        try {
+            const lastNotified = Number(app.homey.settings.get('lastCrashNotification')) || 0;
+            const elapsed = Date.now() - lastNotified;
+            if (elapsed < 0 || elapsed >= MIN_NOTIFICATION_INTERVAL_MS) { // < 0: clock went backwards
+                // Set before posting: a crash loop may kill the app before the post resolves.
+                app.homey.settings.set('lastCrashNotification', Date.now());
+                const firstLine = crash.split('\n')[0].replace(/^\S+ /, '').slice(0, 250); // drop the timestamp
+                app.homey.notifications
+                    .createNotification({ excerpt: `Solis Modbus crashed and was restarted: ${firstLine}` })
+                    .catch((err: unknown) => app.error('=== Could not post crash notification', err));
+                app.homey.flow
+                    .getTriggerCard('app_crashed')
+                    .trigger({ error: firstLine })
+                    .catch((err: unknown) => app.error('=== Could not fire app_crashed flow trigger', err));
+            }
+        } catch (err) {
+            app.error('=== Could not prepare crash notification', err);
         }
     } else if (wasRunning) {
         app.error('=== Previous run ended without an exit event (SIGKILL/SIGTERM: memory limit, app update or reboot)');
     }
 
-    app.homey.setInterval(() => {
-        const m = process.memoryUsage();
-        const mb = (n: number): string => (n / 1024 / 1024).toFixed(1);
-        app.log(`=== Memory rss=${mb(m.rss)}MB heapUsed=${mb(m.heapUsed)}MB external=${mb(m.external)}MB`);
-    }, MEMORY_LOG_INTERVAL_MS);
+    // process.memoryUsage() (and its .rss()) throws ENOENT in Homey's sandbox, which cannot read RSS; v8 heap stats can.
+    // peakRSS comes from getrusage(2), not /proc; guarded separately so heap stats log regardless.
+    const logMemory = (): void => {
+        let line: string;
+        try {
+            const h = v8.getHeapStatistics();
+            let peakRss = 'n/a';
+            try {
+                peakRss = `${mb(process.resourceUsage().maxRSS * 1024)}MB`; // maxRSS is in KB
+            } catch {
+                // Unavailable in this sandbox.
+            }
+            line = `=== Memory heapUsed=${mb(h.used_heap_size)}MB heapTotal=${mb(h.total_heap_size)}MB `
+                + `external=${mb(h.external_memory)}MB heapLimit=${mb(h.heap_size_limit)}MB peakRSS=${peakRss}`;
+        } catch (err) {
+            app.homey.clearInterval(memoryTimer);
+            app.error('=== Memory stats unavailable, stopping memory log', err);
+            return;
+        }
+        app.log(line);
+    };
+    const memoryTimer = app.homey.setInterval(logMemory, MEMORY_LOG_INTERVAL_MS);
+    logMemory();
 }
 
 function readAndRemove(file: string): string | undefined {

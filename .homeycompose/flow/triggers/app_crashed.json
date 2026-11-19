@@ -1,0 +1,19 @@
+{
+  "id": "app_crashed",
+  "title": {
+    "en": "Solis Modbus app crashed and was restarted"
+  },
+  "hint": {
+    "en": "Fires when the app starts again after a crash. At most once per hour."
+  },
+  "tokens": [
+    {
+      "name": "error",
+      "type": "string",
+      "title": {
+        "en": "Error"
+      },
+      "example": "uncaughtException: Error: ENOENT: no such file or directory"
+    }
+  ]
+}
