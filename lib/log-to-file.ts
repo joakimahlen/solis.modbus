@@ -9,11 +9,17 @@ const PORT = 8008;
 
 /**
  * Mirrors stdout/stderr to /userdata/std.log and serves it on port 8008.
- * Rotates to std.log.1 at MAX_FILE_BYTES so the log cannot fill the disk.
+ * Survives app restarts; rotates to std.log.1 at MAX_FILE_BYTES so the log cannot fill the disk.
  */
 export function logToFile(): void {
-    let fd = fs.openSync(LOG_FILE, 'w');
-    let size = 0;
+    // Append, so a restart keeps the previous run's output (including whatever it logged before dying).
+    let fd = fs.openSync(LOG_FILE, 'a');
+    let size = fs.fstatSync(fd).size;
+    try {
+        size += fs.writeSync(fd, `\n===== ${new Date().toISOString()} app start, pid ${process.pid} =====\n`);
+    } catch {
+        // Logging must never take the app down (e.g. ENOSPC).
+    }
 
     const append = (chunk: string | Uint8Array): void => {
         try {
@@ -51,5 +57,8 @@ export function logToFile(): void {
             fs.createReadStream(file).on('error', next).on('end', next).pipe(res, { end: false });
         };
         next();
-    }).listen(PORT);
+    })
+        // Without a listener, EADDRINUSE would be an uncaught exception and crash the app.
+        .on('error', (err) => console.error(`=== Log server on port ${PORT} failed: ${err.message}`))
+        .listen(PORT);
 }
